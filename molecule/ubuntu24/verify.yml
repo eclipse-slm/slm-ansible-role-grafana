@@ -1,0 +1,319 @@
+---
+- name: Verify the test host
+  hosts: all
+  become: true
+  gather_facts: true
+  vars_files:
+    - group_vars/all.yml
+  tasks:
+    - name: Assert the test instance is Ubuntu 24.04
+      ansible.builtin.assert:
+        that:
+          - ansible_distribution == "Ubuntu"
+          - ansible_distribution_version == "24.04"
+
+    - name: Wait for Grafana health endpoint
+      ansible.builtin.uri:
+        url: http://127.0.0.1:3000/api/health
+        status_code: 200
+      register: grafana_health
+      retries: 30
+      delay: 5
+      until: grafana_health.status == 200
+
+    - name: Verify Grafana data persisted through container replacement
+      ansible.builtin.command:
+        argv:
+          - docker
+          - compose
+          - --project-name
+          - "{{ fabos_grafana_project_name }}"
+          - exec
+          - -T
+          - grafana
+          - sh
+          - -c
+          - "test -f /var/lib/grafana/molecule-volume-marker"
+        chdir: "{{ fabos_grafana_project_dir }}"
+      changed_when: false
+
+    - name: Read the normalized Compose configuration
+      ansible.builtin.command:
+        cmd: docker compose --project-name "{{ fabos_grafana_project_name }}" config --format json
+        chdir: "{{ fabos_grafana_project_dir }}"
+      register: grafana_compose_config
+      changed_when: false
+
+    - name: Assert values survive Compose serialization
+      ansible.builtin.assert:
+        that:
+          - >-
+            (grafana_compose_config.stdout | from_json).services.grafana.environment.GF_TEST_VALUE
+            == 'quoted: value #1'
+          - >-
+            (grafana_compose_config.stdout | from_json).services.grafana.environment.GF_SECURITY_ADMIN_PASSWORD
+            == '$$__file{/etc/grafana/secrets/admin_password}'
+          - "'Molecule-Test${MISSING}Tail' not in grafana_compose_config.stdout"
+
+    - name: Inspect the initial admin password file
+      ansible.builtin.stat:
+        path: "{{ fabos_grafana_project_dir }}/secrets/admin_password"
+      register: grafana_admin_password_file
+
+    - name: Assert the password file permissions match the Grafana container UID
+      ansible.builtin.assert:
+        that:
+          - grafana_admin_password_file.stat.mode == '0400'
+          - grafana_admin_password_file.stat.uid | int == fabos_grafana_container_uid
+
+    - name: Assert Grafana receives literal dollar characters
+      ansible.builtin.command:
+        argv:
+          - docker
+          - compose
+          - --project-name
+          - "{{ fabos_grafana_project_name }}"
+          - exec
+          - -T
+          - grafana
+          - sh
+          - -c
+          - >-
+            test "$GF_SECURITY_ADMIN_PASSWORD" = '$__file{/etc/grafana/secrets/admin_password}' &&
+            test "$GF_TEST_VALUE" = 'quoted: value #1'
+        chdir: "{{ fabos_grafana_project_dir }}"
+      changed_when: false
+
+    - name: Authenticate with the configured initial admin password
+      ansible.builtin.uri:
+        url: http://127.0.0.1:3000/api/user
+        method: GET
+        url_username: admin
+        url_password: "Molecule-Test${MISSING}Tail"
+        force_basic_auth: true
+        status_code: 200
+
+    - name: Inspect the persistent Grafana data volume
+      community.docker.docker_volume_info:
+        name: "{{ fabos_grafana_data_volume_name }}"
+      register: grafana_data_volume
+
+    - name: Assert the persistent data volume exists
+      ansible.builtin.assert:
+        that:
+          - grafana_data_volume.exists
+
+    - name: Find rendered Grafana provisioning files
+      ansible.builtin.find:
+        paths: "{{ fabos_grafana_project_dir }}/provisioning"
+        patterns:
+          - "*.yml"
+          - "*.yaml"
+        recurse: true
+      register: grafana_provisioning_files
+
+    - name: Assert expected provisioning files were generated
+      ansible.builtin.assert:
+        that:
+          - >-
+            (fabos_grafana_project_dir ~ '/provisioning/datasources/eclipse-slm-grafana-datasources.yml')
+            in
+            (grafana_provisioning_files.files | map(attribute='path') | list)
+          - >-
+            (fabos_grafana_project_dir ~ '/provisioning/dashboards/eclipse-slm-grafana-dashboard-providers.yml')
+            in
+            (grafana_provisioning_files.files | map(attribute='path') | list)
+          - >-
+            (fabos_grafana_project_dir ~ '/provisioning/alerting/eclipse-slm-grafana-alert-rules.yml')
+            in
+            (grafana_provisioning_files.files | map(attribute='path') | list)
+          - >-
+            (fabos_grafana_project_dir ~ '/provisioning/alerting/eclipse-slm-grafana-contact-points.yml')
+            in
+            (grafana_provisioning_files.files | map(attribute='path') | list)
+          - >-
+            (fabos_grafana_project_dir ~ '/provisioning/alerting/eclipse-slm-grafana-notification-policies.yml')
+            in
+            (grafana_provisioning_files.files | map(attribute='path') | list)
+          - >-
+            (fabos_grafana_project_dir ~ '/provisioning/alerting/eclipse-slm-grafana-templates.yml')
+            in
+            (grafana_provisioning_files.files | map(attribute='path') | list)
+          - >-
+            (fabos_grafana_project_dir ~ '/provisioning/alerting/eclipse-slm-grafana-mute-times.yml')
+            in
+            (grafana_provisioning_files.files | map(attribute='path') | list)
+
+    - name: Read generated alerting provisioning files
+      ansible.builtin.slurp:
+        src: "{{ item.path }}"
+      loop:
+        - path: "{{ fabos_grafana_project_dir }}/provisioning/alerting/eclipse-slm-grafana-alert-rules.yml"
+          expected: Molecule test alert
+        - path: "{{ fabos_grafana_project_dir }}/provisioning/alerting/eclipse-slm-grafana-contact-points.yml"
+          expected: Molecule email
+        - path: "{{ fabos_grafana_project_dir }}/provisioning/alerting/eclipse-slm-grafana-notification-policies.yml"
+          expected: Molecule email
+        - path: "{{ fabos_grafana_project_dir }}/provisioning/alerting/eclipse-slm-grafana-templates.yml"
+          expected: Molecule alert
+        - path: "{{ fabos_grafana_project_dir }}/provisioning/alerting/eclipse-slm-grafana-mute-times.yml"
+          expected: Molecule mute timing
+      register: grafana_alerting_files
+      no_log: true
+
+    - name: Assert configured alerting values and native template syntax
+      ansible.builtin.assert:
+        that:
+          - item.item.expected in (item.content | b64decode)
+          - >-
+            ('{' ~ '{ define "molecule-template" }') in (item.content | b64decode)
+            if item.item.path.endswith('templates.yml') else true
+      loop: "{{ grafana_alerting_files.results }}"
+      loop_control:
+        label: "{{ item.item.path | basename }}"
+      no_log: true
+
+    - name: Read provisioned dashboard model
+      ansible.builtin.slurp:
+        src: "{{ fabos_grafana_dashboard_dir }}/molecule-test.json"
+      register: grafana_test_dashboard
+
+    - name: Assert provisioned dashboard title
+      ansible.builtin.assert:
+        that:
+          - (grafana_test_dashboard.content | b64decode | from_json).title == "Molecule test dashboard"
+
+    - name: Query provisioned Grafana datasources
+      ansible.builtin.uri:
+        url: http://127.0.0.1:3000/api/datasources
+        method: GET
+        url_username: admin
+        url_password: "Molecule-Test${MISSING}Tail"
+        force_basic_auth: true
+        status_code: 200
+        return_content: true
+      register: grafana_datasources
+
+    - name: Assert the test datasource was provisioned
+      ansible.builtin.assert:
+        that:
+          - grafana_datasources.json | selectattr('name', 'equalto', 'Molecule Prometheus') | list | length == 1
+          - (grafana_datasources.json | selectattr('name', 'equalto', 'Molecule Prometheus') | first).jsonData.moleculeRevision == 2
+
+    - name: Query the Prometheus fixture directly
+      ansible.builtin.uri:
+        url: "{{ molecule_prometheus_url }}/api/v1/query?query=up"
+        status_code: 200
+        return_content: true
+      register: grafana_prometheus_up
+      retries: 30
+      delay: 5
+      until: grafana_prometheus_up.status | default(0) == 200
+
+    - name: Assert the Prometheus fixture is scraping
+      ansible.builtin.assert:
+        that:
+          - grafana_prometheus_up.json.data.result | length > 0
+          - >-
+            grafana_prometheus_up.json.data.result
+            | map(attribute='value') | map('last') | select('equalto', '1') | list | length > 0
+
+    - name: Query the datasource health endpoint
+      ansible.builtin.uri:
+        url: http://127.0.0.1:3000/api/datasources/uid/molecule-prometheus/health
+        method: GET
+        url_username: admin
+        url_password: "Molecule-Test${MISSING}Tail"
+        force_basic_auth: true
+        status_code: 200
+        return_content: true
+      register: grafana_datasource_health
+      retries: 20
+      delay: 5
+      until: grafana_datasource_health.status | default(0) == 200
+
+    - name: Assert Grafana can reach Prometheus
+      ansible.builtin.assert:
+        that:
+          - grafana_datasource_health.json.status == 'OK'
+        fail_msg: >-
+          Grafana cannot reach {{ molecule_prometheus_url }}.
+
+    - name: Query the datasource through Grafana
+      ansible.builtin.uri:
+        url: http://127.0.0.1:3000/api/ds/query
+        method: POST
+        url_username: admin
+        url_password: "Molecule-Test${MISSING}Tail"
+        force_basic_auth: true
+        body_format: json
+        status_code: 200
+        return_content: true
+        body:
+          from: now-5m
+          to: now
+          queries:
+            - refId: A
+              datasource:
+                type: prometheus
+                uid: molecule-prometheus
+              expr: up
+              instant: true
+              range: false
+              format: table
+      register: grafana_datasource_query
+
+    - name: Assert the datasource returns sample values
+      ansible.builtin.assert:
+        that:
+          - grafana_datasource_query.json.results.A.status | int == 200
+          - grafana_datasource_query.json.results.A.frames | length > 0
+          - grafana_datasource_query.json.results.A.frames[0].data.values[1] | length > 0
+
+    - name: Query provisioned Grafana alert rules
+      ansible.builtin.uri:
+        url: http://127.0.0.1:3000/api/v1/provisioning/alert-rules
+        method: GET
+        url_username: admin
+        url_password: "Molecule-Test${MISSING}Tail"
+        force_basic_auth: true
+        status_code: 200
+        return_content: true
+      register: grafana_alert_rules
+
+    - name: Assert the test alert rule is active in Grafana
+      ansible.builtin.assert:
+        that:
+          - grafana_alert_rules.json | selectattr('title', 'equalto', 'Molecule test alert') | list | length == 1
+
+    - name: Query provisioned Grafana contact points
+      ansible.builtin.uri:
+        url: http://127.0.0.1:3000/api/v1/provisioning/contact-points
+        method: GET
+        url_username: admin
+        url_password: "Molecule-Test${MISSING}Tail"
+        force_basic_auth: true
+        status_code: 200
+        return_content: true
+      register: grafana_contact_points
+
+    - name: Assert the test contact point is active in Grafana
+      ansible.builtin.assert:
+        that:
+          - grafana_contact_points.json | selectattr('name', 'equalto', 'Molecule email') | list | length == 1
+
+    - name: Search for provisioned Grafana dashboard
+      ansible.builtin.uri:
+        url: http://127.0.0.1:3000/api/search?query=Molecule%20test%20dashboard
+        method: GET
+        url_username: admin
+        url_password: "Molecule-Test${MISSING}Tail"
+        force_basic_auth: true
+        status_code: 200
+        return_content: true
+      register: grafana_dashboard_search
+
+    - name: Assert the test dashboard is available through the Grafana API
+      ansible.builtin.assert:
+        that:
+          - grafana_dashboard_search.json | selectattr('title', 'equalto', 'Molecule test dashboard') | list | length == 1

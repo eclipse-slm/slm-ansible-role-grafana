@@ -1,0 +1,117 @@
+# Shared configuration for the KubeVirt scenario's converge, side-effect, and verify plays.
+---
+fabos_grafana_project_dir: "/opt/grafana-test$dir"
+fabos_grafana_dashboard_dir: "{{ fabos_grafana_project_dir }}/dashboards/role-managed"
+fabos_grafana_project_name: grafana
+fabos_grafana_data_volume_name: grafana-data
+# Prometheus runs outside the Grafana Compose project and is addressed by the
+# VM address so container-local 127.0.0.1 is never used.
+molecule_prometheus_url: "http://{{ ansible_default_ipv4.address }}:9090"
+# Pin the Grafana release the scenario's API assertions target.
+fabos_grafana_version: "13.3.0"
+fabos_grafana_admin_password: "Molecule-Test${MISSING}Tail"
+fabos_grafana_container_uid: 472
+fabos_grafana_container_gid: 472
+fabos_grafana_environment:
+  GF_TEST_VALUE: "quoted: value #1"
+fabos_grafana_datasources:
+  - name: Molecule Prometheus
+    uid: molecule-prometheus
+    type: prometheus
+    access: proxy
+    url: http://localhost:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      moleculeRevision: 1
+fabos_grafana_dashboard_providers:
+  - name: molecule
+    orgId: 1
+    folder: Molecule
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: false
+    options:
+      path: /etc/grafana/dashboards
+fabos_grafana_dashboards:
+  molecule-test.json:
+    id: null
+    uid: molecule-test
+    title: Molecule test dashboard
+    tags: []
+    timezone: browser
+    schemaVersion: 39
+    version: 0
+    panels: []
+fabos_grafana_alerting:
+  alert_rules:
+    - orgId: 1
+      name: Molecule test rules
+      folder: Molecule
+      interval: 60s
+      rules:
+        - uid: molecule-test-rule
+          title: Molecule test alert
+          condition: A
+          data:
+            - refId: A
+              datasourceUid: __expr__
+              model:
+                conditions:
+                  - evaluator:
+                      params: [0]
+                      type: gt
+                    operator:
+                      type: and
+                    query:
+                      params: [A]
+                    reducer:
+                      params: []
+                      type: last
+                    type: query
+                datasource:
+                  type: __expr__
+                  uid: __expr__
+                expression: 1==0
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: A
+                type: math
+          noDataState: NoData
+          execErrState: Error
+          for: 60s
+          annotations: {}
+          labels: {}
+  delete_rules: []
+  contact_points:
+    - orgId: 1
+      name: Molecule email
+      receivers:
+        - uid: molecule-email
+          type: email
+          settings:
+            addresses: grafana@example.invalid
+  delete_contact_points: []
+  notification_policies:
+    - orgId: 1
+      receiver: Molecule email
+      group_by: ['...']
+  reset_policies: []
+  templates:
+    - orgId: 1
+      name: molecule-template
+      template: !unsafe |
+        {{ define "molecule-template" }}
+        Molecule alert {{ .Status }}
+        {{ end }}
+  delete_templates: []
+  mute_timings:
+    - orgId: 1
+      name: Molecule mute timing
+      time_intervals:
+        - times:
+            - start_time: "00:00"
+              end_time: "23:59"
+          location: UTC
+  delete_mute_timings: []
