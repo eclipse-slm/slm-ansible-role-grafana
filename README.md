@@ -210,14 +210,20 @@ For a complete runnable example, see the `ubuntu24` Molecule scenario. It starts
 
 ## Testing
 
-The Molecule `kubevirt` scenario creates and destroys an Ubuntu 24.04 VM through [`molecule_generic`](https://github.com/eclipse-slm/molecule_generic) and its KubeVirt backend. The test VM is prepared with Docker using the Eclipse SLM Docker role. A KubeVirt cluster and working kubeconfig are required. The test uses the reserved namespace `eclipse-slm-grafana-molecule` and a randomly generated, ephemeral VM SSH password; set `GRAFANA_MOLECULE_NAMESPACE` to a unique namespace for concurrent runs.
+The Molecule `ubuntu24` scenario creates and destroys an Ubuntu 24.04 VM through [`molecule_generic`](https://github.com/eclipse-slm/molecule_generic) and its KubeVirt backend. The KubeVirt driver is selected by `MOLECULE_DRIVER: kubevirt` in the scenario's `ansible.env`. The test VM is prepared with Docker using the Eclipse SLM Docker role. A KubeVirt cluster and working kubeconfig are required.
+
+The KubeVirt backend creates the VM in the `molecule` namespace by default (`molecule_kubevirt_default_namespace`). For concurrent runs, set `molecule_namespace` to a unique namespace per run.
+
+The scenario provisions one of every supported resource category, then runs `side_effect` to remove the Grafana containers while keeping the data volume, so `verify` can prove data survives container replacement. It also starts a `prom/prometheus:v3.16.0` fixture on port 9090 outside the Grafana Compose project, and asserts that the provisioned Prometheus datasource is healthy and returns query results. The VM therefore needs outbound access to Docker Hub on first run.
 
 Install the scenario's role and collection dependencies, then run the full scenario:
 
 ```sh
 ansible-galaxy install -r requirements.yml
-molecule test -s kubevirt
+molecule test -s ubuntu24
 ```
+
+The test sequence is `converge`, `idempotence`, `side_effect`, `verify`, surrounded by `dependency`, `destroy`, `syntax`, `create`, `prepare`, and a final `destroy`. To iterate without destroying the VM between steps, use `molecule create -s ubuntu24`, then `converge`, `side-effect`, and `verify`.
 
 For a local check that empty provisioning inputs generate no files:
 
