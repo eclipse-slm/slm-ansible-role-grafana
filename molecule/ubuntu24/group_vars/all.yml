@@ -19,7 +19,7 @@ fabos_grafana_datasources:
     uid: molecule-prometheus
     type: prometheus
     access: proxy
-    url: http://localhost:9090
+    url: "{{ molecule_prometheus_url }}"
     isDefault: true
     editable: false
     jsonData:

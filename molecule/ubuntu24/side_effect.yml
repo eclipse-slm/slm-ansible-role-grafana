@@ -1,0 +1,51 @@
+---
+- name: Reapply a changed Grafana provisioning input
+  hosts: all
+  become: true
+  vars_files:
+    - group_vars/all.yml
+  tasks:
+    - name: Write a marker to Grafana's persistent data volume
+      ansible.builtin.command:
+        argv:
+          - docker
+          - compose
+          - --project-name
+          - "{{ fabos_grafana_project_name }}"
+          - exec
+          - -T
+          - grafana
+          - sh
+          - -c
+          - "touch /var/lib/grafana/molecule-volume-marker"
+        chdir: "{{ fabos_grafana_project_dir }}"
+      changed_when: true
+
+    - name: Remove Grafana containers while preserving the data volume
+      community.docker.docker_compose_v2:
+        project_src: "{{ fabos_grafana_project_dir }}"
+        project_name: "{{ fabos_grafana_project_name }}"
+        state: absent
+        remove_volumes: false
+
+    - name: Set an updated Grafana datasource model
+      ansible.builtin.set_fact:
+        fabos_grafana_datasources:
+          - name: Molecule Prometheus
+            uid: molecule-prometheus
+            type: prometheus
+            access: proxy
+            url: "{{ molecule_prometheus_url }}"
+            isDefault: true
+            editable: false
+            jsonData:
+              moleculeRevision: 2
+
+    - name: Confirm the side-effect input overrides the initial datasource
+      ansible.builtin.assert:
+        that:
+          - fabos_grafana_datasources[0].jsonData.moleculeRevision == 2
+
+    - name: Apply the updated Grafana role
+      ansible.builtin.include_role:
+        name: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}"

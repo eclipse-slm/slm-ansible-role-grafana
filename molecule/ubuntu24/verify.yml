@@ -268,7 +268,8 @@
         that:
           - grafana_datasource_query.json.results.A.status | int == 200
           - grafana_datasource_query.json.results.A.frames | length > 0
-          - grafana_datasource_query.json.results.A.frames[0].data.values[1] | length > 0
+          - grafana_datasource_query.json.results.A.frames[0].data['values'][1] | length > 0
+          - grafana_datasource_query.json.results.A.frames[0].data['values'][1][0] | int == 1
 
     - name: Query provisioned Grafana alert rules
       ansible.builtin.uri:
