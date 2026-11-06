@@ -1,0 +1,10 @@
+---
+- name: Converge Grafana role
+  hosts: all
+  become: true
+  vars_files:
+    - group_vars/all.yml
+  tasks:
+    - name: Include Grafana role under test
+      ansible.builtin.include_role:
+        name: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}"

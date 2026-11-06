@@ -208,7 +208,9 @@
       register: grafana_prometheus_up
       retries: 30
       delay: 5
-      until: grafana_prometheus_up.status | default(0) == 200
+      until: >-
+        grafana_prometheus_up.status | default(0) == 200
+        and (grafana_prometheus_up.json.data.result | default([])) | length > 0
 
     - name: Assert the Prometheus fixture is scraping
       ansible.builtin.assert:
@@ -217,6 +219,9 @@
           - >-
             grafana_prometheus_up.json.data.result
             | map(attribute='value') | map('last') | select('equalto', '1') | list | length > 0
+        fail_msg: >-
+          Prometheus at {{ molecule_prometheus_url }} is reachable but reports no
+          healthy scrape target for "up".
 
     - name: Query the datasource health endpoint
       ansible.builtin.uri:
@@ -225,19 +230,22 @@
         url_username: admin
         url_password: "Molecule-Test${MISSING}Tail"
         force_basic_auth: true
-        status_code: 200
         return_content: true
       register: grafana_datasource_health
       retries: 20
       delay: 5
       until: grafana_datasource_health.status | default(0) == 200
+      failed_when: false
 
     - name: Assert Grafana can reach Prometheus
       ansible.builtin.assert:
         that:
-          - grafana_datasource_health.json.status == 'OK'
+          - grafana_datasource_health.status | default(0) == 200
+          - grafana_datasource_health.json.status | default('') == 'OK'
         fail_msg: >-
-          Grafana cannot reach {{ molecule_prometheus_url }}.
+          Grafana cannot reach {{ molecule_prometheus_url }}: health endpoint
+          returned HTTP {{ grafana_datasource_health.status | default('no response') }}
+          with body {{ grafana_datasource_health.content | default('') | truncate(300) }}
 
     - name: Query the datasource through Grafana
       ansible.builtin.uri:

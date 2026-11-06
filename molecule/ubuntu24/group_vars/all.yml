@@ -6,7 +6,7 @@ fabos_grafana_project_name: grafana
 fabos_grafana_data_volume_name: grafana-data
 # Prometheus runs outside the Grafana Compose project and is addressed by the
 # VM address so container-local 127.0.0.1 is never used.
-molecule_prometheus_url: "http://{{ ansible_default_ipv4.address }}:9090"
+molecule_prometheus_url: "http://{{ ansible_facts['default_ipv4']['address'] }}:9090"
 # Pin the Grafana release the scenario's API assertions target.
 fabos_grafana_version: "13.3.0"
 fabos_grafana_admin_password: "Molecule-Test${MISSING}Tail"

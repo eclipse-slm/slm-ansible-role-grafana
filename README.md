@@ -204,9 +204,9 @@ A working datasource returns `"status":"OK"`, for example:
 {"details":{"application":"Prometheus"},"message":"Successfully queried the Prometheus API.","status":"OK"}
 ```
 
-The same call with a `background` query is what proves data flows, and it is how the test suite verifies the wiring.
+Grafana reports an unreachable or misconfigured Prometheus from this endpoint with a non-200 status, so a failing check surfaces as an HTTP error rather than a JSON body.
 
-For a complete runnable example, see the `ubuntu24` Molecule scenario. It starts a `prom/prometheus` container on port 9090 outside the Grafana Compose project, provisions the datasource against the host address, and asserts the health endpoint plus a real query result.
+For a complete runnable example, see the `ubuntu24` Molecule scenario. It starts a `prom/prometheus` container on port 9090 outside the Grafana Compose project, provisions the datasource against the host address, and asserts the health endpoint plus a real query result: it POSTs an instant `up` query to Grafana's `/api/ds/query` endpoint and checks that samples come back.
 
 ## Testing
 
