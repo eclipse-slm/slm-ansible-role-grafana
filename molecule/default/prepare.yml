@@ -1,0 +1,6 @@
+---
+- name: Prepare Ubuntu test instance
+  hosts: all
+  become: true
+  roles:
+    - role: eclipse-slm.docker

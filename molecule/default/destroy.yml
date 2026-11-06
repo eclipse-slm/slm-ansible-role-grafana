@@ -1,0 +1,11 @@
+---
+- name: Destroy test instances
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Destroy instances through molecule_generic
+      ansible.builtin.include_role:
+        name: molecule_generic
+        tasks_from: destroy.yml
+      no_log: true
