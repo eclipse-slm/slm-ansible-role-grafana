@@ -1,0 +1,25 @@
+---
+- name: Check that the role rejects Docker-incompatible bind mount paths
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    fabos_grafana_admin_password: test-only-password
+    fabos_grafana_project_dir: /tmp/grafana:invalid
+  tasks:
+    - name: Expect path validation to reject a colon
+      block:
+        - name: Run Grafana role validation
+          ansible.builtin.include_role:
+            name: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}"
+            tasks_from: validate.yml
+
+        - name: Fail if role validation accepts the colon path
+          ansible.builtin.fail:
+            msg: The role accepted a Docker-incompatible project directory.
+      rescue:
+        - name: Assert the role failed for the bind path reason
+          ansible.builtin.assert:
+            that:
+              - "'cannot contain a colon' in ansible_failed_result.msg"
+            fail_msg: "Unexpected validation result: {{ ansible_failed_result.msg }}"

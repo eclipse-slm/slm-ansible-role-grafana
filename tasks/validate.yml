@@ -1,0 +1,43 @@
+---
+- name: Require an initial Grafana admin password
+  ansible.builtin.assert:
+    that:
+      - fabos_grafana_admin_password is string
+      - fabos_grafana_admin_password | length > 0
+    fail_msg: fabos_grafana_admin_password must be set to a non-empty secret.
+
+- name: Validate Grafana HTTP port
+  ansible.builtin.assert:
+    that:
+      - fabos_grafana_http_port | string is match('^[0-9]+$')
+      - fabos_grafana_http_port | int >= 1
+      - fabos_grafana_http_port | int <= 65535
+    fail_msg: fabos_grafana_http_port must be an integer between 1 and 65535.
+
+- name: Validate Grafana restart policy
+  ansible.builtin.assert:
+    that:
+      - fabos_grafana_restart_policy in ['no', 'always', 'on-failure', 'unless-stopped']
+    fail_msg: fabos_grafana_restart_policy must be a valid Docker restart policy.
+
+- name: Validate Grafana image pull policy
+  ansible.builtin.assert:
+    that:
+      - fabos_grafana_pull_policy in ['always', 'missing', 'never', 'policy']
+    fail_msg: fabos_grafana_pull_policy must be always, missing, never, or policy.
+
+- name: Validate Docker bind mount paths
+  ansible.builtin.assert:
+    that:
+      - "':' not in fabos_grafana_project_dir"
+      - "':' not in fabos_grafana_dashboard_dir"
+    fail_msg: Docker bind mount paths cannot contain a colon.
+
+- name: Validate Grafana dashboard model filenames
+  ansible.builtin.assert:
+    that:
+      - item.key is match('^[A-Za-z0-9][A-Za-z0-9_.-]*\.json$')
+    fail_msg: "Dashboard model filename '{{ item.key }}' must be a simple .json filename."
+  loop: "{{ fabos_grafana_dashboards | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"

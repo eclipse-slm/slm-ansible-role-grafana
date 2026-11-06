@@ -1,0 +1,9 @@
+---
+- name: Validate Grafana settings
+  ansible.builtin.import_tasks: validate.yml
+
+- name: Configure Grafana Compose project
+  ansible.builtin.import_tasks: configure.yml
+
+- name: Deploy Grafana
+  ansible.builtin.import_tasks: deploy.yml

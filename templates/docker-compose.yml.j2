@@ -1,0 +1,32 @@
+---
+services:
+  grafana:
+    image: "{{ fabos_grafana_image }}:{{ fabos_grafana_version }}"
+    restart: "{{ fabos_grafana_restart_policy }}"
+    ports:
+      - target: 3000
+        published: "{{ fabos_grafana_http_port }}"
+        protocol: tcp
+    environment:
+{{ _fabos_grafana_environment | to_nice_yaml(indent=2) | indent(6, true) }}
+      GF_SECURITY_ADMIN_PASSWORD: "$$__file{/etc/grafana/secrets/admin_password}"
+    volumes:
+      - type: volume
+        source: grafana_data
+        target: /var/lib/grafana
+      - type: bind
+        source: {{ ((fabos_grafana_project_dir ~ '/provisioning') | replace('$', '$$')) | to_json }}
+        target: /etc/grafana/provisioning
+        read_only: true
+      - type: bind
+        source: {{ (fabos_grafana_dashboard_dir | replace('$', '$$')) | to_json }}
+        target: /etc/grafana/dashboards
+        read_only: true
+      - type: bind
+        source: {{ ((fabos_grafana_project_dir ~ '/secrets') | replace('$', '$$')) | to_json }}
+        target: /etc/grafana/secrets
+        read_only: true
+
+volumes:
+  grafana_data:
+    name: "{{ fabos_grafana_data_volume_name }}"

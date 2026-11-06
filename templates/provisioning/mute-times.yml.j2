@@ -1,0 +1,6 @@
+---
+apiVersion: 1
+muteTimes:
+{{ fabos_grafana_alerting.get('mute_timings', []) | to_nice_yaml(indent=2) | indent(2, true) }}
+deleteMuteTimes:
+{{ fabos_grafana_alerting.get('delete_mute_timings', []) | to_nice_yaml(indent=2) | indent(2, true) }}

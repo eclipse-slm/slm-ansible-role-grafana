@@ -1,0 +1,6 @@
+---
+apiVersion: 1
+policies:
+{{ fabos_grafana_alerting.get('notification_policies', []) | to_nice_yaml(indent=2) | indent(2, true) }}
+resetPolicies:
+{{ fabos_grafana_alerting.get('reset_policies', []) | to_nice_yaml(indent=2) | indent(2, true) }}

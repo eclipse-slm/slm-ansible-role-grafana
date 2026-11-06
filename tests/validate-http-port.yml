@@ -1,0 +1,25 @@
+---
+- name: Check that the role rejects fractional HTTP ports
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    fabos_grafana_admin_password: test-only-password
+    fabos_grafana_http_port: 3000.5
+  tasks:
+    - name: Expect port validation to reject a fractional value
+      block:
+        - name: Run Grafana role validation
+          ansible.builtin.include_role:
+            name: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}"
+            tasks_from: validate.yml
+
+        - name: Fail if role validation accepts a fractional port
+          ansible.builtin.fail:
+            msg: The role accepted a fractional Grafana HTTP port.
+      rescue:
+        - name: Assert the role failed for the integer-port reason
+          ansible.builtin.assert:
+            that:
+              - "'fabos_grafana_http_port must be an integer' in ansible_failed_result.msg"
+            fail_msg: "Unexpected validation result: {{ ansible_failed_result.msg }}"

@@ -1,0 +1,6 @@
+---
+apiVersion: 1
+contactPoints:
+{{ fabos_grafana_alerting.get('contact_points', []) | to_nice_yaml(indent=2) | indent(2, true) }}
+deleteContactPoints:
+{{ fabos_grafana_alerting.get('delete_contact_points', []) | to_nice_yaml(indent=2) | indent(2, true) }}

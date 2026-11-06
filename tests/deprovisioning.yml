@@ -1,0 +1,72 @@
+---
+- name: Check that explicit resource deletion requests are provisioned
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: true
+  vars:
+    fabos_grafana_admin_password: test-only-password
+    fabos_grafana_datasource_prune: true
+    fabos_grafana_delete_datasources:
+      - name: Removed datasource
+        orgId: 1
+    fabos_grafana_alerting:
+      alert_rules: []
+      delete_rules:
+        - orgId: 1
+          uid: removed-alert
+      contact_points: []
+      delete_contact_points:
+        - orgId: 1
+          uid: removed-contact
+      notification_policies: []
+      reset_policies: [1]
+      templates: []
+      delete_templates:
+        - orgId: 1
+          name: removed-template
+      mute_timings: []
+      delete_mute_timings:
+        - orgId: 1
+          name: removed-mute-time
+  tasks:
+    - name: Create a temporary project directory
+      ansible.builtin.tempfile:
+        state: directory
+        prefix: grafana-deprovisioning-
+      register: grafana_deprovisioning_test_directory
+
+    - name: Render explicit resource deletion requests
+      ansible.builtin.include_role:
+        name: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}"
+        tasks_from: configure.yml
+      vars:
+        fabos_grafana_project_dir: "{{ grafana_deprovisioning_test_directory.path }}"
+
+    - name: Read generated datasource and alerting files
+      ansible.builtin.slurp:
+        src: "{{ item }}"
+      loop:
+        - "{{ grafana_deprovisioning_test_directory.path }}/provisioning/datasources/eclipse-slm-grafana-datasources.yml"
+        - "{{ grafana_deprovisioning_test_directory.path }}/provisioning/alerting/eclipse-slm-grafana-alert-rules.yml"
+        - "{{ grafana_deprovisioning_test_directory.path }}/provisioning/alerting/eclipse-slm-grafana-contact-points.yml"
+        - "{{ grafana_deprovisioning_test_directory.path }}/provisioning/alerting/eclipse-slm-grafana-notification-policies.yml"
+        - "{{ grafana_deprovisioning_test_directory.path }}/provisioning/alerting/eclipse-slm-grafana-templates.yml"
+        - "{{ grafana_deprovisioning_test_directory.path }}/provisioning/alerting/eclipse-slm-grafana-mute-times.yml"
+      register: grafana_deprovisioning_files
+
+    - name: Assert explicit datasource and alerting delete directives were rendered
+      ansible.builtin.assert:
+        that:
+          - "'prune: true' in (grafana_deprovisioning_files.results[0].content | b64decode)"
+          - "'Removed datasource' in (grafana_deprovisioning_files.results[0].content | b64decode)"
+          - "'removed-alert' in (grafana_deprovisioning_files.results[1].content | b64decode)"
+          - "'removed-contact' in (grafana_deprovisioning_files.results[2].content | b64decode)"
+          - "'resetPolicies' in (grafana_deprovisioning_files.results[3].content | b64decode)"
+          - "'removed-template' in (grafana_deprovisioning_files.results[4].content | b64decode)"
+          - "'removed-mute-time' in (grafana_deprovisioning_files.results[5].content | b64decode)"
+
+    - name: Remove the temporary project directory
+      ansible.builtin.file:
+        path: "{{ grafana_deprovisioning_test_directory.path }}"
+        state: absent

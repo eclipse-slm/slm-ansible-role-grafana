@@ -1,0 +1,7 @@
+---
+apiVersion: 1
+prune: {{ fabos_grafana_datasource_prune | bool | lower }}
+deleteDatasources:
+{{ fabos_grafana_delete_datasources | to_nice_yaml(indent=2) | indent(2, true) }}
+datasources:
+{{ fabos_grafana_datasources | to_nice_yaml(indent=2) | indent(2, true) }}

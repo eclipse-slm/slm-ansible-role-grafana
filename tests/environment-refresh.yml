@@ -1,0 +1,48 @@
+---
+- name: Check that repeated role use replaces its environment map
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: true
+  vars:
+    fabos_grafana_admin_password: test-only-password
+  tasks:
+    - name: Create a temporary project directory
+      ansible.builtin.tempfile:
+        state: directory
+        prefix: grafana-environment-refresh-
+      register: grafana_environment_test_directory
+
+    - name: Configure the first environment value
+      ansible.builtin.include_role:
+        name: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}"
+        tasks_from: configure.yml
+      vars:
+        fabos_grafana_project_dir: "{{ grafana_environment_test_directory.path }}"
+        fabos_grafana_environment:
+          GF_TEST_OLD_VALUE: stale
+
+    - name: Configure a replacement environment value
+      ansible.builtin.include_role:
+        name: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}"
+        tasks_from: configure.yml
+      vars:
+        fabos_grafana_project_dir: "{{ grafana_environment_test_directory.path }}"
+        fabos_grafana_environment:
+          GF_TEST_NEW_VALUE: current
+
+    - name: Read the final Compose configuration
+      ansible.builtin.slurp:
+        src: "{{ grafana_environment_test_directory.path }}/docker-compose.yml"
+      register: grafana_environment_compose
+
+    - name: Assert the old environment value was removed
+      ansible.builtin.assert:
+        that:
+          - "'GF_TEST_OLD_VALUE' not in (grafana_environment_compose.content | b64decode | from_yaml).services.grafana.environment"
+          - (grafana_environment_compose.content | b64decode | from_yaml).services.grafana.environment.GF_TEST_NEW_VALUE == "current"
+
+    - name: Remove the temporary project directory
+      ansible.builtin.file:
+        path: "{{ grafana_environment_test_directory.path }}"
+        state: absent

@@ -1,0 +1,32 @@
+---
+fabos_grafana_image: grafana/grafana
+fabos_grafana_version: latest
+fabos_grafana_project_name: grafana
+fabos_grafana_project_dir: /opt/grafana
+fabos_grafana_dashboard_dir: "{{ fabos_grafana_project_dir }}/dashboards/role-managed"
+fabos_grafana_container_uid: 472
+fabos_grafana_container_gid: 472
+fabos_grafana_data_volume_name: "{{ fabos_grafana_project_name }}-data"
+fabos_grafana_http_port: 3000
+fabos_grafana_restart_policy: unless-stopped
+fabos_grafana_pull_policy: missing
+fabos_grafana_admin_user: admin
+fabos_grafana_admin_password: ""
+fabos_grafana_plugins: []
+fabos_grafana_environment: {}
+fabos_grafana_datasources: []
+fabos_grafana_delete_datasources: []
+fabos_grafana_datasource_prune: false
+fabos_grafana_dashboard_providers: []
+fabos_grafana_dashboards: {}
+fabos_grafana_alerting:
+  alert_rules: []
+  delete_rules: []
+  contact_points: []
+  delete_contact_points: []
+  notification_policies: []
+  reset_policies: []
+  templates: []
+  delete_templates: []
+  mute_timings: []
+  delete_mute_timings: []

@@ -1,0 +1,6 @@
+---
+apiVersion: 1
+groups:
+{{ fabos_grafana_alerting.get('alert_rules', []) | to_nice_yaml(indent=2) | indent(2, true) }}
+deleteRules:
+{{ fabos_grafana_alerting.get('delete_rules', []) | to_nice_yaml(indent=2) | indent(2, true) }}

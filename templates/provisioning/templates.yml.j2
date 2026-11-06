@@ -1,0 +1,6 @@
+---
+apiVersion: 1
+templates:
+{{ fabos_grafana_alerting.get('templates', []) | to_nice_yaml(indent=2) | indent(2, true) }}
+deleteTemplates:
+{{ fabos_grafana_alerting.get('delete_templates', []) | to_nice_yaml(indent=2) | indent(2, true) }}

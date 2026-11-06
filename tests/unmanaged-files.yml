@@ -1,0 +1,66 @@
+---
+- name: Check that the role preserves files outside its managed paths
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: true
+  vars:
+    fabos_grafana_admin_password: test-only-password
+  tasks:
+    - name: Create a temporary project directory
+      ansible.builtin.tempfile:
+        state: directory
+        prefix: grafana-unmanaged-files-
+      register: grafana_unmanaged_test_directory
+
+    - name: Create a caller-owned dashboard directory
+      ansible.builtin.file:
+        path: "{{ grafana_unmanaged_test_directory.path }}/dashboards"
+        state: directory
+        mode: "0755"
+
+    - name: Create a caller-owned dashboard model
+      ansible.builtin.copy:
+        content: '{"title":"User-owned dashboard"}'
+        dest: "{{ grafana_unmanaged_test_directory.path }}/dashboards/user-owned.json"
+        mode: "0644"
+
+    - name: Create a caller-owned datasource provisioning directory
+      ansible.builtin.file:
+        path: "{{ grafana_unmanaged_test_directory.path }}/provisioning/datasources"
+        state: directory
+        mode: "0755"
+
+    - name: Create a caller-owned datasource provisioning file
+      ansible.builtin.copy:
+        content: "apiVersion: 1\ndatasources: []\n"
+        dest: "{{ grafana_unmanaged_test_directory.path }}/provisioning/datasources/datasources.yml"
+        mode: "0644"
+
+    - name: Configure the role with empty managed inputs
+      ansible.builtin.include_role:
+        name: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}"
+        tasks_from: configure.yml
+      vars:
+        fabos_grafana_project_dir: "{{ grafana_unmanaged_test_directory.path }}"
+
+    - name: Check caller-owned files still exist
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - "{{ grafana_unmanaged_test_directory.path }}/dashboards/user-owned.json"
+        - "{{ grafana_unmanaged_test_directory.path }}/provisioning/datasources/datasources.yml"
+      register: grafana_unmanaged_file_stats
+
+    - name: Assert caller-owned files were not removed
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+      loop: "{{ grafana_unmanaged_file_stats.results }}"
+      loop_control:
+        label: "{{ item.item | basename }}"
+
+    - name: Remove the temporary project directory
+      ansible.builtin.file:
+        path: "{{ grafana_unmanaged_test_directory.path }}"
+        state: absent

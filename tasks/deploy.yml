@@ -1,0 +1,12 @@
+---
+- name: Mark Grafana Compose project as managed
+  ansible.builtin.set_fact:
+    _fabos_grafana_compose_active: true
+
+- name: Ensure Grafana Compose project is running
+  community.docker.docker_compose_v2:
+    project_src: "{{ fabos_grafana_project_dir }}"
+    project_name: "{{ fabos_grafana_project_name }}"
+    state: present
+    pull: "{{ fabos_grafana_pull_policy }}"
+  no_log: true
