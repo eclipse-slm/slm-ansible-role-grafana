@@ -1,7 +1,7 @@
 # Shared configuration for the KubeVirt scenario's converge, side-effect, and verify plays.
 ---
 fabos_grafana_project_dir: "/opt/grafana-test$dir"
-fabos_grafana_dashboard_dir: "{{ fabos_grafana_project_dir }}/dashboards/role-managed"
+fabos_grafana_dashboard_dir: "{{ fabos_grafana_config_dir }}/dashboards/role-managed"
 fabos_grafana_project_name: grafana
 fabos_grafana_data_volume_name: grafana-data
 # Prometheus runs outside the Grafana Compose project and is addressed by the

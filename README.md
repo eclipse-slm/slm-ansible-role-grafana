@@ -42,7 +42,8 @@ All role variables use the `fabos_grafana_` prefix.
 | `fabos_grafana_project_name` | `grafana` | Docker Compose project name and prefix for the persistent volume. |
 | `fabos_grafana_project_dir` | `/opt/grafana` | Host directory containing Compose and provisioning files. |
 | `fabos_grafana_compose_file` | `docker-compose.yml` | Compose file name written inside `fabos_grafana_project_dir` and used to deploy the project. Must be a plain `.yml`/`.yaml` filename. |
-| `fabos_grafana_dashboard_dir` | `<project_dir>/dashboards/role-managed` | Role-managed dashboard JSON directory. Keep this reserved for files managed by the role. |
+| `fabos_grafana_config_dir` | `<project_dir>` | Host base directory for the `provisioning`, `dashboards` and `secrets` bind-mount sources. |
+| `fabos_grafana_dashboard_dir` | `<config_dir>/dashboards/role-managed` | Role-managed dashboard JSON directory. Keep this reserved for files managed by the role. |
 | `fabos_grafana_data_volume_name` | `<project_name>-data` | Persistent Docker volume name. Set explicitly to retain the same data volume if changing the Compose project name. |
 | `fabos_grafana_http_port` | `3000` | Host port mapped to Grafana's port 3000. Must be an integer from 1 to 65535. |
 | `fabos_grafana_restart_policy` | `unless-stopped` | Docker restart policy (`no`, `always`, `on-failure`, or `unless-stopped`). |

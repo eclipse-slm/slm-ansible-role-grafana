@@ -7,9 +7,17 @@
     group: root
     mode: "0750"
 
+- name: Create Grafana config directory
+  ansible.builtin.file:
+    path: "{{ fabos_grafana_config_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+
 - name: Create Grafana provisioning directory
   ansible.builtin.file:
-    path: "{{ fabos_grafana_project_dir }}/provisioning"
+    path: "{{ fabos_grafana_config_dir }}/provisioning"
     state: directory
     owner: root
     group: root
@@ -17,7 +25,7 @@
 
 - name: Create Grafana dashboards directory
   ansible.builtin.file:
-    path: "{{ fabos_grafana_project_dir }}/dashboards"
+    path: "{{ fabos_grafana_config_dir }}/dashboards"
     state: directory
     owner: root
     group: root
@@ -25,7 +33,7 @@
 
 - name: Create Grafana provisioning subdirectories
   ansible.builtin.file:
-    path: "{{ fabos_grafana_project_dir }}/provisioning/{{ item }}"
+    path: "{{ fabos_grafana_config_dir }}/provisioning/{{ item }}"
     state: directory
     owner: root
     group: root
@@ -47,7 +55,7 @@
 
 - name: Create Grafana secret directory
   ansible.builtin.file:
-    path: "{{ fabos_grafana_project_dir }}/secrets"
+    path: "{{ fabos_grafana_config_dir }}/secrets"
     state: directory
     owner: root
     group: root
@@ -56,7 +64,7 @@
 - name: Write initial Grafana admin password file
   ansible.builtin.copy:
     content: "{{ fabos_grafana_admin_password }}"
-    dest: "{{ fabos_grafana_project_dir }}/secrets/admin_password"
+    dest: "{{ fabos_grafana_config_dir }}/secrets/admin_password"
     owner: "{{ fabos_grafana_container_uid }}"
     group: "{{ fabos_grafana_container_gid }}"
     mode: "0400"
@@ -65,7 +73,7 @@
 - name: Write Grafana datasource provisioning
   ansible.builtin.template:
     src: provisioning/datasources.yml.j2
-    dest: "{{ fabos_grafana_project_dir }}/provisioning/datasources/eclipse-slm-grafana-datasources.yml"
+    dest: "{{ fabos_grafana_config_dir }}/provisioning/datasources/eclipse-slm-grafana-datasources.yml"
     owner: root
     group: root
     mode: "0640"
@@ -78,7 +86,7 @@
 
 - name: Remove datasource provisioning when no datasources are configured
   ansible.builtin.file:
-    path: "{{ fabos_grafana_project_dir }}/provisioning/datasources/eclipse-slm-grafana-datasources.yml"
+    path: "{{ fabos_grafana_config_dir }}/provisioning/datasources/eclipse-slm-grafana-datasources.yml"
     state: absent
   when:
     - fabos_grafana_datasources | length == 0
@@ -89,7 +97,7 @@
 - name: Write Grafana dashboard provider provisioning
   ansible.builtin.template:
     src: provisioning/dashboard-providers.yml.j2
-    dest: "{{ fabos_grafana_project_dir }}/provisioning/dashboards/eclipse-slm-grafana-dashboard-providers.yml"
+    dest: "{{ fabos_grafana_config_dir }}/provisioning/dashboards/eclipse-slm-grafana-dashboard-providers.yml"
     owner: root
     group: root
     mode: "0640"
@@ -99,7 +107,7 @@
 
 - name: Remove dashboard provider provisioning when no providers are configured
   ansible.builtin.file:
-    path: "{{ fabos_grafana_project_dir }}/provisioning/dashboards/eclipse-slm-grafana-dashboard-providers.yml"
+    path: "{{ fabos_grafana_config_dir }}/provisioning/dashboards/eclipse-slm-grafana-dashboard-providers.yml"
     state: absent
   when: fabos_grafana_dashboard_providers | length == 0
   notify: Restart Grafana after provisioning change
@@ -139,7 +147,7 @@
 - name: Write Grafana alert rule provisioning
   ansible.builtin.template:
     src: provisioning/alert-rules.yml.j2
-    dest: "{{ fabos_grafana_project_dir }}/provisioning/alerting/eclipse-slm-grafana-alert-rules.yml"
+    dest: "{{ fabos_grafana_config_dir }}/provisioning/alerting/eclipse-slm-grafana-alert-rules.yml"
     owner: root
     group: root
     mode: "0640"
@@ -151,7 +159,7 @@
 
 - name: Remove alert rule provisioning when no rules are configured
   ansible.builtin.file:
-    path: "{{ fabos_grafana_project_dir }}/provisioning/alerting/eclipse-slm-grafana-alert-rules.yml"
+    path: "{{ fabos_grafana_config_dir }}/provisioning/alerting/eclipse-slm-grafana-alert-rules.yml"
     state: absent
   when:
     - fabos_grafana_alerting.get('alert_rules', []) | length == 0
@@ -161,7 +169,7 @@
 - name: Write Grafana contact point provisioning
   ansible.builtin.template:
     src: provisioning/contact-points.yml.j2
-    dest: "{{ fabos_grafana_project_dir }}/provisioning/alerting/eclipse-slm-grafana-contact-points.yml"
+    dest: "{{ fabos_grafana_config_dir }}/provisioning/alerting/eclipse-slm-grafana-contact-points.yml"
     owner: root
     group: root
     mode: "0640"
@@ -173,7 +181,7 @@
 
 - name: Remove contact point provisioning when none are configured
   ansible.builtin.file:
-    path: "{{ fabos_grafana_project_dir }}/provisioning/alerting/eclipse-slm-grafana-contact-points.yml"
+    path: "{{ fabos_grafana_config_dir }}/provisioning/alerting/eclipse-slm-grafana-contact-points.yml"
     state: absent
   when:
     - fabos_grafana_alerting.get('contact_points', []) | length == 0
@@ -183,7 +191,7 @@
 - name: Write Grafana notification policy provisioning
   ansible.builtin.template:
     src: provisioning/notification-policies.yml.j2
-    dest: "{{ fabos_grafana_project_dir }}/provisioning/alerting/eclipse-slm-grafana-notification-policies.yml"
+    dest: "{{ fabos_grafana_config_dir }}/provisioning/alerting/eclipse-slm-grafana-notification-policies.yml"
     owner: root
     group: root
     mode: "0640"
@@ -195,7 +203,7 @@
 
 - name: Remove notification policy provisioning when none are configured
   ansible.builtin.file:
-    path: "{{ fabos_grafana_project_dir }}/provisioning/alerting/eclipse-slm-grafana-notification-policies.yml"
+    path: "{{ fabos_grafana_config_dir }}/provisioning/alerting/eclipse-slm-grafana-notification-policies.yml"
     state: absent
   when:
     - fabos_grafana_alerting.get('notification_policies', []) | length == 0
@@ -205,7 +213,7 @@
 - name: Write Grafana notification template provisioning
   ansible.builtin.template:
     src: provisioning/templates.yml.j2
-    dest: "{{ fabos_grafana_project_dir }}/provisioning/alerting/eclipse-slm-grafana-templates.yml"
+    dest: "{{ fabos_grafana_config_dir }}/provisioning/alerting/eclipse-slm-grafana-templates.yml"
     owner: root
     group: root
     mode: "0640"
@@ -217,7 +225,7 @@
 
 - name: Remove notification template provisioning when none are configured
   ansible.builtin.file:
-    path: "{{ fabos_grafana_project_dir }}/provisioning/alerting/eclipse-slm-grafana-templates.yml"
+    path: "{{ fabos_grafana_config_dir }}/provisioning/alerting/eclipse-slm-grafana-templates.yml"
     state: absent
   when:
     - fabos_grafana_alerting.get('templates', []) | length == 0
@@ -227,7 +235,7 @@
 - name: Write Grafana mute timing provisioning
   ansible.builtin.template:
     src: provisioning/mute-times.yml.j2
-    dest: "{{ fabos_grafana_project_dir }}/provisioning/alerting/eclipse-slm-grafana-mute-times.yml"
+    dest: "{{ fabos_grafana_config_dir }}/provisioning/alerting/eclipse-slm-grafana-mute-times.yml"
     owner: root
     group: root
     mode: "0640"
@@ -239,7 +247,7 @@
 
 - name: Remove mute timing provisioning when none are configured
   ansible.builtin.file:
-    path: "{{ fabos_grafana_project_dir }}/provisioning/alerting/eclipse-slm-grafana-mute-times.yml"
+    path: "{{ fabos_grafana_config_dir }}/provisioning/alerting/eclipse-slm-grafana-mute-times.yml"
     state: absent
   when:
     - fabos_grafana_alerting.get('mute_timings', []) | length == 0

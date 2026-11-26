@@ -37,6 +37,7 @@
   ansible.builtin.assert:
     that:
       - "':' not in fabos_grafana_project_dir"
+      - "':' not in fabos_grafana_config_dir"
       - "':' not in fabos_grafana_dashboard_dir"
     fail_msg: Docker bind mount paths cannot contain a colon.
 

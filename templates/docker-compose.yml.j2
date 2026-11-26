@@ -15,7 +15,7 @@ services:
         source: grafana_data
         target: /var/lib/grafana
       - type: bind
-        source: {{ ((fabos_grafana_project_dir ~ '/provisioning') | replace('$', '$$')) | to_json }}
+        source: {{ ((fabos_grafana_config_dir ~ '/provisioning') | replace('$', '$$')) | to_json }}
         target: /etc/grafana/provisioning
         read_only: true
       - type: bind
@@ -23,7 +23,7 @@ services:
         target: /etc/grafana/dashboards
         read_only: true
       - type: bind
-        source: {{ ((fabos_grafana_project_dir ~ '/secrets') | replace('$', '$$')) | to_json }}
+        source: {{ ((fabos_grafana_config_dir ~ '/secrets') | replace('$', '$$')) | to_json }}
         target: /etc/grafana/secrets
         read_only: true
 

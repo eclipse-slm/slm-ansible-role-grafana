@@ -53,7 +53,7 @@
 
     - name: Inspect the initial admin password file
       ansible.builtin.stat:
-        path: "{{ fabos_grafana_project_dir }}/secrets/admin_password"
+        path: "{{ fabos_grafana_config_dir }}/secrets/admin_password"
       register: grafana_admin_password_file
 
     - name: Assert the password file permissions match the Grafana container UID
@@ -103,7 +103,7 @@
 
     - name: Find rendered Grafana provisioning files
       ansible.builtin.find:
-        paths: "{{ fabos_grafana_project_dir }}/provisioning"
+        paths: "{{ fabos_grafana_config_dir }}/provisioning"
         patterns:
           - "*.yml"
           - "*.yaml"
@@ -114,31 +114,31 @@
       ansible.builtin.assert:
         that:
           - >-
-            (fabos_grafana_project_dir ~ '/provisioning/datasources/eclipse-slm-grafana-datasources.yml')
+            (fabos_grafana_config_dir ~ '/provisioning/datasources/eclipse-slm-grafana-datasources.yml')
             in
             (grafana_provisioning_files.files | map(attribute='path') | list)
           - >-
-            (fabos_grafana_project_dir ~ '/provisioning/dashboards/eclipse-slm-grafana-dashboard-providers.yml')
+            (fabos_grafana_config_dir ~ '/provisioning/dashboards/eclipse-slm-grafana-dashboard-providers.yml')
             in
             (grafana_provisioning_files.files | map(attribute='path') | list)
           - >-
-            (fabos_grafana_project_dir ~ '/provisioning/alerting/eclipse-slm-grafana-alert-rules.yml')
+            (fabos_grafana_config_dir ~ '/provisioning/alerting/eclipse-slm-grafana-alert-rules.yml')
             in
             (grafana_provisioning_files.files | map(attribute='path') | list)
           - >-
-            (fabos_grafana_project_dir ~ '/provisioning/alerting/eclipse-slm-grafana-contact-points.yml')
+            (fabos_grafana_config_dir ~ '/provisioning/alerting/eclipse-slm-grafana-contact-points.yml')
             in
             (grafana_provisioning_files.files | map(attribute='path') | list)
           - >-
-            (fabos_grafana_project_dir ~ '/provisioning/alerting/eclipse-slm-grafana-notification-policies.yml')
+            (fabos_grafana_config_dir ~ '/provisioning/alerting/eclipse-slm-grafana-notification-policies.yml')
             in
             (grafana_provisioning_files.files | map(attribute='path') | list)
           - >-
-            (fabos_grafana_project_dir ~ '/provisioning/alerting/eclipse-slm-grafana-templates.yml')
+            (fabos_grafana_config_dir ~ '/provisioning/alerting/eclipse-slm-grafana-templates.yml')
             in
             (grafana_provisioning_files.files | map(attribute='path') | list)
           - >-
-            (fabos_grafana_project_dir ~ '/provisioning/alerting/eclipse-slm-grafana-mute-times.yml')
+            (fabos_grafana_config_dir ~ '/provisioning/alerting/eclipse-slm-grafana-mute-times.yml')
             in
             (grafana_provisioning_files.files | map(attribute='path') | list)
 
@@ -146,15 +146,15 @@
       ansible.builtin.slurp:
         src: "{{ item.path }}"
       loop:
-        - path: "{{ fabos_grafana_project_dir }}/provisioning/alerting/eclipse-slm-grafana-alert-rules.yml"
+        - path: "{{ fabos_grafana_config_dir }}/provisioning/alerting/eclipse-slm-grafana-alert-rules.yml"
           expected: Molecule test alert
-        - path: "{{ fabos_grafana_project_dir }}/provisioning/alerting/eclipse-slm-grafana-contact-points.yml"
+        - path: "{{ fabos_grafana_config_dir }}/provisioning/alerting/eclipse-slm-grafana-contact-points.yml"
           expected: Molecule email
-        - path: "{{ fabos_grafana_project_dir }}/provisioning/alerting/eclipse-slm-grafana-notification-policies.yml"
+        - path: "{{ fabos_grafana_config_dir }}/provisioning/alerting/eclipse-slm-grafana-notification-policies.yml"
           expected: Molecule email
-        - path: "{{ fabos_grafana_project_dir }}/provisioning/alerting/eclipse-slm-grafana-templates.yml"
+        - path: "{{ fabos_grafana_config_dir }}/provisioning/alerting/eclipse-slm-grafana-templates.yml"
           expected: Molecule alert
-        - path: "{{ fabos_grafana_project_dir }}/provisioning/alerting/eclipse-slm-grafana-mute-times.yml"
+        - path: "{{ fabos_grafana_config_dir }}/provisioning/alerting/eclipse-slm-grafana-mute-times.yml"
           expected: Molecule mute timing
       register: grafana_alerting_files
       no_log: true
