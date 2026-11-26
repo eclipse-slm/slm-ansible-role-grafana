@@ -26,6 +26,13 @@
       - fabos_grafana_pull_policy in ['always', 'missing', 'never', 'policy']
     fail_msg: fabos_grafana_pull_policy must be always, missing, never, or policy.
 
+- name: Validate Grafana Compose file name
+  ansible.builtin.assert:
+    that:
+      - fabos_grafana_compose_file is string
+      - fabos_grafana_compose_file is match('^[A-Za-z0-9][A-Za-z0-9_.-]*\.ya?ml$')
+    fail_msg: fabos_grafana_compose_file must be a simple .yml or .yaml filename without a directory.
+
 - name: Validate Docker bind mount paths
   ansible.builtin.assert:
     that:

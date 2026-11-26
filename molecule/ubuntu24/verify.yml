@@ -22,6 +22,8 @@
           - compose
           - --project-name
           - "{{ fabos_grafana_project_name }}"
+          - --file
+          - "{{ fabos_grafana_compose_file }}"
           - exec
           - -T
           - grafana
@@ -33,7 +35,7 @@
 
     - name: Read the normalized Compose configuration
       ansible.builtin.command:
-        cmd: docker compose --project-name "{{ fabos_grafana_project_name }}" config --format json
+        cmd: docker compose --project-name "{{ fabos_grafana_project_name }}" --file "{{ fabos_grafana_compose_file }}" config --format json
         chdir: "{{ fabos_grafana_project_dir }}"
       register: grafana_compose_config
       changed_when: false
@@ -67,6 +69,8 @@
           - compose
           - --project-name
           - "{{ fabos_grafana_project_name }}"
+          - --file
+          - "{{ fabos_grafana_compose_file }}"
           - exec
           - -T
           - grafana

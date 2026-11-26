@@ -12,6 +12,8 @@
           - compose
           - --project-name
           - "{{ fabos_grafana_project_name }}"
+          - --file
+          - "{{ fabos_grafana_compose_file }}"
           - exec
           - -T
           - grafana
@@ -25,6 +27,8 @@
       community.docker.docker_compose_v2:
         project_src: "{{ fabos_grafana_project_dir }}"
         project_name: "{{ fabos_grafana_project_name }}"
+        files:
+          - "{{ fabos_grafana_compose_file }}"
         state: absent
         remove_volumes: false
 
