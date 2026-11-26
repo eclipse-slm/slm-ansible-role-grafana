@@ -26,6 +26,12 @@
       - fabos_grafana_pull_policy in ['always', 'missing', 'never', 'policy']
     fail_msg: fabos_grafana_pull_policy must be always, missing, never, or policy.
 
+- name: Validate Grafana remove orphans flag
+  ansible.builtin.assert:
+    that:
+      - fabos_grafana_remove_orphans is boolean
+    fail_msg: fabos_grafana_remove_orphans must be a boolean.
+
 - name: Validate Grafana Compose file name
   ansible.builtin.assert:
     that:

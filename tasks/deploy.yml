@@ -34,5 +34,5 @@
       - "{{ fabos_grafana_compose_file }}"
     state: present
     pull: "{{ fabos_grafana_pull_policy }}"
-    remove_orphans: true
+    remove_orphans: "{{ fabos_grafana_remove_orphans }}"
   no_log: true

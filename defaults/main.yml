@@ -12,6 +12,7 @@ fabos_grafana_data_volume_name: "{{ fabos_grafana_project_name }}-data"
 fabos_grafana_http_port: 3000
 fabos_grafana_restart_policy: unless-stopped
 fabos_grafana_pull_policy: missing
+fabos_grafana_remove_orphans: false
 fabos_grafana_admin_user: admin
 fabos_grafana_admin_password: ""
 fabos_grafana_plugins: []

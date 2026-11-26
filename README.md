@@ -48,6 +48,7 @@ All role variables use the `fabos_grafana_` prefix.
 | `fabos_grafana_http_port` | `3000` | Host port mapped to Grafana's port 3000. Must be an integer from 1 to 65535. |
 | `fabos_grafana_restart_policy` | `unless-stopped` | Docker restart policy (`no`, `always`, `on-failure`, or `unless-stopped`). |
 | `fabos_grafana_pull_policy` | `missing` | Compose image pull policy (`always`, `missing`, `never`, or `policy`). |
+| `fabos_grafana_remove_orphans` | `false` | Remove containers in the Compose project whose service is no longer in the Compose file (for example after disabling Loki or Alloy). When `false`, such containers keep running. |
 | `fabos_grafana_container_uid` / `_gid` | `472` / `472` | Owner of the host-side initial-password file, matching the official Grafana container user. |
 | `fabos_grafana_admin_user` | `admin` | Initial Grafana administrator username. |
 | `fabos_grafana_admin_password` | `""` (required) | Initial administrator password. The role fails if empty. Store the value in Ansible Vault. |
