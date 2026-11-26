@@ -1,0 +1,12 @@
+# Managed by Ansible (eclipse_slm.grafana)
+apiVersion: 1
+providers:
+  - name: eclipse-slm-builtin
+    orgId: 1
+    folder: {{ fabos_grafana_builtin_dashboard_folder | to_json }}
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: false
+    options:
+      path: /etc/grafana/builtin-dashboards

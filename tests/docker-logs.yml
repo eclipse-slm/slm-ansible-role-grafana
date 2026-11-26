@@ -1,0 +1,161 @@
+---
+- name: Check that Docker container log collection and its dashboard render
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: true
+  vars:
+    fabos_grafana_admin_password: test-only-password
+    grafana_docker_logs_project: "{{ grafana_docker_logs_test_directory.path }}/docker$logs"
+  tasks:
+    - name: Create a temporary project directory
+      ansible.builtin.tempfile:
+        state: directory
+        prefix: grafana-docker-logs-
+      register: grafana_docker_logs_test_directory
+
+    - name: Configure Grafana with Docker container log collection
+      ansible.builtin.include_role:
+        name: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}"
+        tasks_from: configure.yml
+      vars:
+        fabos_grafana_project_dir: "{{ grafana_docker_logs_project }}"
+        fabos_grafana_loki_enabled: true
+        fabos_grafana_alloy_enabled: true
+        fabos_grafana_alloy_docker_logs_enabled: true
+        fabos_grafana_loki_datasource_uid: test-logs
+        fabos_grafana_builtin_dashboard_folder: Containers
+
+    - name: Validate the generated Compose configuration
+      ansible.builtin.command:
+        cmd: docker compose config --format json
+        chdir: "{{ grafana_docker_logs_project }}"
+      register: grafana_docker_logs_compose
+      changed_when: false
+
+    - name: Read generated Alloy, provider and dashboard files
+      ansible.builtin.slurp:
+        src: "{{ grafana_docker_logs_project }}/{{ item }}"
+      loop:
+        - alloy/config.alloy
+        - provisioning/dashboards/eclipse-slm-grafana-builtin-dashboard-providers.yml
+        - builtin-dashboards/docker-container-logs.json
+      register: grafana_docker_logs_files
+
+    - name: Assert Docker log collection and the dashboard rendered correctly
+      vars:
+        compose: "{{ grafana_docker_logs_compose.stdout | from_json }}"
+        alloy: "{{ grafana_docker_logs_files.results[0].content | b64decode }}"
+        providers: "{{ (grafana_docker_logs_files.results[1].content | b64decode | from_yaml).providers }}"
+        dashboard_text: "{{ grafana_docker_logs_files.results[2].content | b64decode }}"
+        dashboard: "{{ dashboard_text | from_json }}"
+        legend_format: "{{ '{' ~ '{container_name}}' }}"
+        socket_mount: >-
+          {{ compose.services.alloy.volumes | selectattr('target', 'equalto', '/var/run/docker.sock') | first }}
+        builtin_mount: >-
+          {{ compose.services.grafana.volumes | selectattr('target', 'equalto', '/etc/grafana/builtin-dashboards') | first }}
+      ansible.builtin.assert:
+        that:
+          - socket_mount.source == '/var/run/docker.sock'
+          - socket_mount.read_only
+          - builtin_mount.source == grafana_docker_logs_test_directory.path ~ '/docker$$logs/builtin-dashboards'
+          - builtin_mount.read_only
+          - "'discovery.docker \"containers\"' in alloy"
+          - "'host = \"unix:///var/run/docker.sock\"' in alloy"
+          - "'loki.source.docker \"containers\"' in alloy"
+          - "'forward_to    = [loki.write.default.receiver]' in alloy"
+          - "'local.file_match \"files\"' in alloy"
+          - providers | length == 1
+          - providers[0].name == 'eclipse-slm-builtin'
+          - providers[0].folder == 'Containers'
+          - providers[0].options.path == '/etc/grafana/builtin-dashboards'
+          - dashboard.uid == 'docker-container-logs'
+          - "'__FABOS_LOKI_DATASOURCE_UID__' not in dashboard_text"
+          - "'\"uid\": \"test-logs\"' in dashboard_text"
+          - legend_format in dashboard_text
+
+    - name: Validate the generated Alloy configuration syntax
+      ansible.builtin.command:
+        argv:
+          - docker
+          - run
+          - --rm
+          - --volume
+          - "{{ grafana_docker_logs_project }}/alloy/config.alloy:/tmp/config.alloy:ro"
+          - grafana/alloy:latest
+          - fmt
+          - /tmp/config.alloy
+      changed_when: false
+
+    - name: Reconfigure the same project with Docker log collection disabled
+      ansible.builtin.include_role:
+        name: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}"
+        tasks_from: configure.yml
+      vars:
+        fabos_grafana_project_dir: "{{ grafana_docker_logs_project }}"
+        fabos_grafana_loki_enabled: true
+        fabos_grafana_alloy_enabled: true
+
+    - name: Validate the Compose configuration without Docker log collection
+      ansible.builtin.command:
+        cmd: docker compose config --format json
+        chdir: "{{ grafana_docker_logs_project }}"
+      register: grafana_docker_logs_disabled_compose
+      changed_when: false
+
+    - name: Read the Alloy configuration without Docker log collection
+      ansible.builtin.slurp:
+        src: "{{ grafana_docker_logs_project }}/alloy/config.alloy"
+      register: grafana_docker_logs_disabled_alloy
+
+    - name: Look for leftover built-in dashboard files
+      ansible.builtin.stat:
+        path: "{{ grafana_docker_logs_project }}/{{ item }}"
+      loop:
+        - provisioning/dashboards/eclipse-slm-grafana-builtin-dashboard-providers.yml
+        - builtin-dashboards/docker-container-logs.json
+      register: grafana_docker_logs_leftovers
+
+    - name: Assert disabling removes the socket mount, Docker config and dashboard
+      vars:
+        compose: "{{ grafana_docker_logs_disabled_compose.stdout | from_json }}"
+        alloy: "{{ grafana_docker_logs_disabled_alloy.content | b64decode }}"
+      ansible.builtin.assert:
+        that:
+          - compose.services.alloy.volumes | selectattr('target', 'equalto', '/var/run/docker.sock') | list | length == 0
+          - compose.services.grafana.volumes | selectattr('target', 'equalto', '/etc/grafana/builtin-dashboards') | list | length == 0
+          - "'discovery.docker' not in alloy"
+          - grafana_docker_logs_leftovers.results | selectattr('stat.exists') | list | length == 0
+
+    - name: Remove the temporary project directory
+      ansible.builtin.file:
+        path: "{{ grafana_docker_logs_test_directory.path }}"
+        state: absent
+
+- name: Check that the role rejects a relative Docker socket path
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    fabos_grafana_admin_password: test-only-password
+    fabos_grafana_alloy_enabled: true
+    fabos_grafana_loki_enabled: true
+    fabos_grafana_alloy_docker_logs_enabled: true
+    fabos_grafana_alloy_docker_socket: var/run/docker.sock
+  tasks:
+    - name: Expect socket validation to reject a relative path
+      block:
+        - name: Run Grafana role validation
+          ansible.builtin.include_role:
+            name: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}"
+            tasks_from: validate.yml
+
+        - name: Fail if role validation accepts a relative socket path
+          ansible.builtin.fail:
+            msg: The role accepted a relative Docker socket path.
+      rescue:
+        - name: Assert the role failed for the socket-path reason
+          ansible.builtin.assert:
+            that:
+              - "'fabos_grafana_alloy_docker_socket must be an absolute path' in ansible_failed_result.msg"
+            fail_msg: "Unexpected validation result: {{ ansible_failed_result.msg }}"

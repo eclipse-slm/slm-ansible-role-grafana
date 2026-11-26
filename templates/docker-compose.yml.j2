@@ -26,6 +26,12 @@ services:
         source: {{ ((fabos_grafana_config_dir ~ '/secrets') | replace('$', '$$')) | to_json }}
         target: /etc/grafana/secrets
         read_only: true
+{% if fabos_grafana_docker_logs_dashboard_enabled %}
+      - type: bind
+        source: {{ ((fabos_grafana_config_dir ~ '/builtin-dashboards') | replace('$', '$$')) | to_json }}
+        target: /etc/grafana/builtin-dashboards
+        read_only: true
+{% endif %}
 {% if fabos_grafana_loki_enabled %}
 
   loki:
@@ -80,6 +86,12 @@ services:
         target: {{ (log_dir | replace('$', '$$')) | to_json }}
         read_only: true
 {% endfor %}
+{% if fabos_grafana_alloy_docker_logs_enabled %}
+      - type: bind
+        source: {{ (fabos_grafana_alloy_docker_socket | replace('$', '$$')) | to_json }}
+        target: /var/run/docker.sock
+        read_only: true
+{% endif %}
 {% endif %}
 
 volumes:

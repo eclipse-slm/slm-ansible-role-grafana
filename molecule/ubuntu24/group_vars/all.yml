@@ -18,6 +18,7 @@ fabos_grafana_loki_enabled: true
 fabos_grafana_loki_version: "3.6.0"
 fabos_grafana_alloy_enabled: true
 fabos_grafana_alloy_version: "v1.22.0"
+fabos_grafana_alloy_docker_logs_enabled: true
 fabos_grafana_environment:
   GF_TEST_VALUE: "quoted: value #1"
 fabos_grafana_datasources:

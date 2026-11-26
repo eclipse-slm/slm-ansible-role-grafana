@@ -40,6 +40,9 @@
             | selectattr('target', 'equalto', '/etc/grafana/dashboards')
             | map(attribute='source') | first)
             == (grafana_empty_test_directory.path ~ '/grafana-$$role-path/dashboards/role-managed')
+          - >-
+            (grafana_empty_compose_config.stdout | from_json).services.grafana.volumes
+            | selectattr('target', 'equalto', '/etc/grafana/builtin-dashboards') | list | length == 0
 
     - name: Find generated provisioning files
       ansible.builtin.find:

@@ -19,6 +19,52 @@ loki.source.file "files" {
   forward_to = [loki.write.default.receiver]
 }
 
+{% if fabos_grafana_alloy_docker_logs_enabled %}
+discovery.docker "containers" {
+  host = "unix:///var/run/docker.sock"
+}
+
+discovery.relabel "containers" {
+  targets = []
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/?(.*)"
+    target_label  = "container_name"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/?(.*)"
+    target_label  = "service_name"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    regex         = "(.+)"
+    target_label  = "service_name"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_project"]
+    regex         = "(.+)"
+    target_label  = "compose_project"
+  }
+
+  rule {
+    target_label = "host"
+    replacement  = {{ fabos_grafana_alloy_docker_logs_host | string | to_json }}
+  }
+}
+
+loki.source.docker "containers" {
+  host          = "unix:///var/run/docker.sock"
+  targets       = discovery.docker.containers.targets
+  relabel_rules = discovery.relabel.containers.rules
+  forward_to    = [loki.write.default.receiver]
+}
+
+{% endif %}
 loki.write "default" {
   endpoint {
     url = {{ (_fabos_grafana_loki_effective_url ~ '/loki/api/v1/push') | to_json }}

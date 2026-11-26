@@ -306,6 +306,35 @@
       delay: 5
       until: "'varlogs' in (grafana_loki_jobs.json.data | default([]))"
 
+    - name: Wait for Alloy to ship Docker container logs to Loki
+      ansible.builtin.uri:
+        url: http://127.0.0.1:3100/loki/api/v1/label/container_name/values
+        return_content: true
+      register: grafana_loki_containers
+      retries: 30
+      delay: 5
+      until: (grafana_loki_containers.json.data | default([]) | select('match', '^grafana-grafana-') | list | length) > 0
+
+    - name: Query the built-in Docker container logs dashboard
+      ansible.builtin.uri:
+        url: http://127.0.0.1:3000/api/dashboards/uid/docker-container-logs
+        method: GET
+        url_username: admin
+        url_password: "Molecule-Test${MISSING}Tail"
+        force_basic_auth: true
+        status_code: 200
+        return_content: true
+      register: grafana_docker_logs_dashboard
+
+    - name: Assert the built-in dashboard is provisioned against the Loki datasource
+      ansible.builtin.assert:
+        that:
+          - grafana_docker_logs_dashboard.json.dashboard.title == 'Docker container logs'
+          - grafana_docker_logs_dashboard.json.meta.folderTitle == 'Docker'
+          - >-
+            grafana_docker_logs_dashboard.json.dashboard.panels
+            | map(attribute='datasource.uid') | unique | list == ['loki']
+
     - name: Query provisioned Grafana alert rules
       ansible.builtin.uri:
         url: http://127.0.0.1:3000/api/v1/provisioning/alert-rules

@@ -158,6 +158,48 @@
   when: item.path | basename not in (fabos_grafana_dashboards.keys() | list)
   notify: Restart Grafana after provisioning change
 
+- name: Create built-in dashboard directory
+  ansible.builtin.file:
+    path: "{{ fabos_grafana_config_dir }}/builtin-dashboards"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: fabos_grafana_docker_logs_dashboard_enabled
+
+- name: Write built-in dashboard provider provisioning
+  ansible.builtin.template:
+    src: provisioning/builtin-dashboard-providers.yml.j2
+    dest: "{{ fabos_grafana_config_dir }}/provisioning/dashboards/eclipse-slm-grafana-builtin-dashboard-providers.yml"
+    owner: root
+    group: root
+    mode: "0640"
+  when: fabos_grafana_docker_logs_dashboard_enabled
+  notify: Restart Grafana after provisioning change
+
+# Copied rather than templated: the dashboard uses Grafana's own {{label}} legend syntax.
+- name: Write Docker container logs dashboard
+  ansible.builtin.copy:
+    content: >-
+      {{ lookup('ansible.builtin.file', 'dashboards/docker-container-logs.json')
+         | replace('__FABOS_LOKI_DATASOURCE_UID__', fabos_grafana_loki_datasource_uid) }}
+    dest: "{{ fabos_grafana_config_dir }}/builtin-dashboards/docker-container-logs.json"
+    owner: root
+    group: root
+    mode: "0644"
+  when: fabos_grafana_docker_logs_dashboard_enabled
+  notify: Restart Grafana after provisioning change
+
+- name: Remove built-in dashboards when they are disabled
+  ansible.builtin.file:
+    path: "{{ fabos_grafana_config_dir }}/{{ item }}"
+    state: absent
+  loop:
+    - provisioning/dashboards/eclipse-slm-grafana-builtin-dashboard-providers.yml
+    - builtin-dashboards
+  when: not fabos_grafana_docker_logs_dashboard_enabled
+  notify: Restart Grafana after provisioning change
+
 - name: Write Grafana alert rule provisioning
   ansible.builtin.template:
     src: provisioning/alert-rules.yml.j2

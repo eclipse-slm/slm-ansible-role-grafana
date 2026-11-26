@@ -65,6 +65,16 @@ fabos_grafana_alloy_file_targets:
 fabos_grafana_alloy_extra_config: ""
 # Raw Alloy configuration that replaces the generated config entirely when non-empty.
 fabos_grafana_alloy_config: ""
+# Collect the logs of all Docker containers on the host. This mounts the Docker socket
+# read-only into Alloy, which grants it root-equivalent access to the host.
+fabos_grafana_alloy_docker_logs_enabled: false
+fabos_grafana_alloy_docker_socket: /var/run/docker.sock
+# Value of the "host" label on collected Docker container log streams.
+fabos_grafana_alloy_docker_logs_host: "{{ inventory_hostname }}"
+
+# Built-in dashboards, provisioned separately from fabos_grafana_dashboards
+fabos_grafana_docker_logs_dashboard_enabled: "{{ fabos_grafana_alloy_enabled and fabos_grafana_alloy_docker_logs_enabled }}"
+fabos_grafana_builtin_dashboard_folder: Docker
 
 # Loki datasource, provisioned automatically when Loki or Alloy is enabled
 fabos_grafana_loki_datasource_enabled: true

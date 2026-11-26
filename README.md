@@ -271,6 +271,11 @@ To add your own components, put [Alloy configuration syntax](https://grafana.com
 | `fabos_grafana_alloy_config` | `""` | Raw Alloy configuration that replaces the generated file when non-empty. |
 | `fabos_grafana_loki_datasource_enabled` | `true` | Provision the Loki datasource automatically when Loki or Alloy is enabled. |
 | `fabos_grafana_loki_datasource_name` / `_uid` | `Loki` / `loki` | Name and UID of the automatic Loki datasource. |
+| `fabos_grafana_alloy_docker_logs_enabled` | `false` | Collect the logs of all Docker containers on the host. See [Docker container logs](#docker-container-logs). |
+| `fabos_grafana_alloy_docker_socket` | `/var/run/docker.sock` | Host path of the Docker socket mounted read-only into Alloy. |
+| `fabos_grafana_alloy_docker_logs_host` | `{{ inventory_hostname }}` | Value of the `host` label on container log streams. |
+| `fabos_grafana_docker_logs_dashboard_enabled` | `<alloy_enabled and alloy_docker_logs_enabled>` | Provision the built-in "Docker container logs" dashboard. |
+| `fabos_grafana_builtin_dashboard_folder` | `Docker` | Grafana folder for the role's built-in dashboards. |
 
 Disabling Loki or Alloy later removes its container (the role deploys with `remove_orphans`) and its config file, but keeps its data volume. The Loki datasource is removed from the provisioning file, but Grafana keeps it in its database unless you list it in `fabos_grafana_delete_datasources` or enable `fabos_grafana_datasource_prune`.
 
@@ -278,6 +283,27 @@ Run the local rendering test (requires Docker, used to validate the generated Al
 
 ```sh
 MOLECULE_PROJECT_DIRECTORY="$PWD" ansible-playbook -i localhost, tests/loki-alloy.yml
+```
+
+### Docker container logs
+
+With `fabos_grafana_alloy_docker_logs_enabled: true`, Alloy discovers every container on the host through the Docker socket (`discovery.docker` → `loki.source.docker`) and ships its stdout/stderr to the same `loki.write "default"` as the file targets. Each stream gets these labels:
+
+| Label | Value |
+| --- | --- |
+| `container_name` | Container name without the leading `/`, for example `grafana-grafana-1`. |
+| `service_name` | Compose service name, or the container name for containers not started by Compose. |
+| `compose_project` | Compose project name; absent for containers not started by Compose. |
+| `host` | `fabos_grafana_alloy_docker_logs_host` (default: `inventory_hostname`). |
+
+**Security:** the Docker socket is mounted read-only, but read-only only protects the socket file. Any process that can talk to the Docker API can start privileged containers, so Alloy effectively has root access to the host. Enable this only where that is acceptable.
+
+The socket is mounted even when `fabos_grafana_alloy_config` replaces the generated configuration, so a custom pipeline can use `unix:///var/run/docker.sock`. The role adds no Docker components to a replaced configuration.
+
+The role also provisions a **Docker container logs** dashboard (uid `docker-container-logs`) in the `fabos_grafana_builtin_dashboard_folder` folder, bound to the Loki datasource UID `fabos_grafana_loki_datasource_uid`. It has filters for host, Compose project, container, and a case-insensitive regex search. Its panels show total, error/warning, and per-container log volume, plus a logs panel. Built-in dashboards are kept apart from `fabos_grafana_dashboards`: they live in `<config_dir>/builtin-dashboards`, mounted at `/etc/grafana/builtin-dashboards`, with their own provider file `provisioning/dashboards/eclipse-slm-grafana-builtin-dashboard-providers.yml`. Set `fabos_grafana_docker_logs_dashboard_enabled: true` to get the dashboard when the logs are collected by another Alloy with the same labels, or `false` to skip it. Disabling it removes both files.
+
+```sh
+MOLECULE_PROJECT_DIRECTORY="$PWD" ansible-playbook -i localhost, tests/docker-logs.yml
 ```
 
 ## Testing

@@ -1,0 +1,260 @@
+{
+  "id": null,
+  "uid": "docker-container-logs",
+  "title": "Docker container logs",
+  "description": "Logs of the Docker containers collected by Grafana Alloy (eclipse_slm.grafana).",
+  "tags": ["docker", "logs", "loki"],
+  "timezone": "browser",
+  "editable": false,
+  "graphTooltip": 1,
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "annotations": {
+    "list": []
+  },
+  "links": [],
+  "templating": {
+    "list": [
+      {
+        "name": "host",
+        "label": "Host",
+        "type": "query",
+        "datasource": {"type": "loki", "uid": "__FABOS_LOKI_DATASOURCE_UID__"},
+        "query": {
+          "label": "host",
+          "stream": "{container_name=~\".+\"}",
+          "type": 1,
+          "refId": "LokiVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {"text": ["All"], "value": ["$__all"]}
+      },
+      {
+        "name": "compose_project",
+        "label": "Compose project",
+        "type": "query",
+        "datasource": {"type": "loki", "uid": "__FABOS_LOKI_DATASOURCE_UID__"},
+        "query": {
+          "label": "compose_project",
+          "stream": "{container_name=~\".+\", host=~\"$host\"}",
+          "type": 1,
+          "refId": "LokiVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {"text": ["All"], "value": ["$__all"]}
+      },
+      {
+        "name": "container_name",
+        "label": "Container",
+        "type": "query",
+        "datasource": {"type": "loki", "uid": "__FABOS_LOKI_DATASOURCE_UID__"},
+        "query": {
+          "label": "container_name",
+          "stream": "{container_name=~\".+\", host=~\"$host\", compose_project=~\"$compose_project\"}",
+          "type": 1,
+          "refId": "LokiVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".+",
+        "current": {"text": ["All"], "value": ["$__all"]}
+      },
+      {
+        "name": "search",
+        "label": "Search (regex, case-insensitive)",
+        "type": "textbox",
+        "query": "",
+        "current": {"text": "", "value": ""}
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Log lines",
+      "gridPos": {"h": 4, "w": 8, "x": 0, "y": 0},
+      "datasource": {"type": "loki", "uid": "__FABOS_LOKI_DATASOURCE_UID__"},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "loki", "uid": "__FABOS_LOKI_DATASOURCE_UID__"},
+          "expr": "sum(count_over_time({container_name=~\"$container_name\", host=~\"$host\", compose_project=~\"$compose_project\"} |~ \"(?i)$search\" [$__range]))",
+          "queryType": "instant"
+        }
+      ],
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {"defaults": {"unit": "short", "noValue": "0"}, "overrides": []}
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Error and warning lines",
+      "description": "Lines matching error, fatal, panic or warn (case-insensitive).",
+      "gridPos": {"h": 4, "w": 8, "x": 8, "y": 0},
+      "datasource": {"type": "loki", "uid": "__FABOS_LOKI_DATASOURCE_UID__"},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "loki", "uid": "__FABOS_LOKI_DATASOURCE_UID__"},
+          "expr": "sum(count_over_time({container_name=~\"$container_name\", host=~\"$host\", compose_project=~\"$compose_project\"} |~ \"(?i)$search\" |~ \"(?i)(error|fatal|panic|warn)\" [$__range]))",
+          "queryType": "instant"
+        }
+      ],
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "text", "value": null},
+              {"color": "orange", "value": 1}
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Containers logging",
+      "gridPos": {"h": 4, "w": 8, "x": 16, "y": 0},
+      "datasource": {"type": "loki", "uid": "__FABOS_LOKI_DATASOURCE_UID__"},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "loki", "uid": "__FABOS_LOKI_DATASOURCE_UID__"},
+          "expr": "count(sum by (container_name) (count_over_time({container_name=~\"$container_name\", host=~\"$host\", compose_project=~\"$compose_project\"} |~ \"(?i)$search\" [$__range])))",
+          "queryType": "instant"
+        }
+      ],
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {"defaults": {"unit": "short", "noValue": "0"}, "overrides": []}
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Log volume per container",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+      "datasource": {"type": "loki", "uid": "__FABOS_LOKI_DATASOURCE_UID__"},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "loki", "uid": "__FABOS_LOKI_DATASOURCE_UID__"},
+          "expr": "sum by (container_name) (count_over_time({container_name=~\"$container_name\", host=~\"$host\", compose_project=~\"$compose_project\"} |~ \"(?i)$search\" [$__interval]))",
+          "legendFormat": "{{container_name}}",
+          "queryType": "range"
+        }
+      ],
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 1,
+            "stacking": {"mode": "normal", "group": "A"}
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Error and warning lines per container",
+      "description": "Lines matching error, fatal, panic or warn (case-insensitive).",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+      "datasource": {"type": "loki", "uid": "__FABOS_LOKI_DATASOURCE_UID__"},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "loki", "uid": "__FABOS_LOKI_DATASOURCE_UID__"},
+          "expr": "sum by (container_name) (count_over_time({container_name=~\"$container_name\", host=~\"$host\", compose_project=~\"$compose_project\"} |~ \"(?i)$search\" |~ \"(?i)(error|fatal|panic|warn)\" [$__interval]))",
+          "legendFormat": "{{container_name}}",
+          "queryType": "range"
+        }
+      ],
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 1,
+            "stacking": {"mode": "normal", "group": "A"}
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 6,
+      "type": "logs",
+      "title": "Logs",
+      "gridPos": {"h": 18, "w": 24, "x": 0, "y": 12},
+      "datasource": {"type": "loki", "uid": "__FABOS_LOKI_DATASOURCE_UID__"},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "loki", "uid": "__FABOS_LOKI_DATASOURCE_UID__"},
+          "expr": "{container_name=~\"$container_name\", host=~\"$host\", compose_project=~\"$compose_project\"} |~ \"(?i)$search\"",
+          "queryType": "range",
+          "maxLines": 1000
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "sortOrder": "Descending"
+      }
+    }
+  ]
+}

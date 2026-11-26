@@ -57,9 +57,29 @@
       - fabos_grafana_alloy_enabled is boolean
       - fabos_grafana_loki_publish_port is boolean
       - fabos_grafana_loki_datasource_enabled is boolean
+      - fabos_grafana_alloy_docker_logs_enabled is boolean
+      - fabos_grafana_docker_logs_dashboard_enabled is boolean
     fail_msg: >-
-      fabos_grafana_loki_enabled, fabos_grafana_alloy_enabled, fabos_grafana_loki_publish_port
-      and fabos_grafana_loki_datasource_enabled must be booleans.
+      fabos_grafana_loki_enabled, fabos_grafana_alloy_enabled, fabos_grafana_loki_publish_port,
+      fabos_grafana_loki_datasource_enabled, fabos_grafana_alloy_docker_logs_enabled
+      and fabos_grafana_docker_logs_dashboard_enabled must be booleans.
+
+- name: Validate the Docker socket path
+  ansible.builtin.assert:
+    that:
+      - fabos_grafana_alloy_docker_socket is string
+      - fabos_grafana_alloy_docker_socket is match('^/')
+      - "':' not in fabos_grafana_alloy_docker_socket"
+    fail_msg: fabos_grafana_alloy_docker_socket must be an absolute path without a colon.
+  when:
+    - fabos_grafana_alloy_enabled
+    - fabos_grafana_alloy_docker_logs_enabled
+
+- name: Validate the built-in dashboard folder
+  ansible.builtin.assert:
+    that:
+      - fabos_grafana_builtin_dashboard_folder is string
+    fail_msg: fabos_grafana_builtin_dashboard_folder must be a string.
 
 - name: Validate Loki HTTP port
   ansible.builtin.assert:
