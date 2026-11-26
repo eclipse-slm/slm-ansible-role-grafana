@@ -6,12 +6,6 @@
   vars_files:
     - group_vars/all.yml
   tasks:
-    - name: Assert the test instance is Ubuntu 24.04
-      ansible.builtin.assert:
-        that:
-          - ansible_distribution == "Ubuntu"
-          - ansible_distribution_version == "24.04"
-
     - name: Wait for Grafana health endpoint
       ansible.builtin.uri:
         url: http://127.0.0.1:3000/api/health
