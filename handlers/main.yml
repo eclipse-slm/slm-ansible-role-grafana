@@ -8,3 +8,29 @@
     state: restarted
   when: _fabos_grafana_compose_active | default(false)
   no_log: true
+
+- name: Restart Loki after configuration change
+  community.docker.docker_compose_v2:
+    project_src: "{{ fabos_grafana_project_dir }}"
+    project_name: "{{ fabos_grafana_project_name }}"
+    files:
+      - "{{ fabos_grafana_compose_file }}"
+    services:
+      - loki
+    state: restarted
+  when:
+    - _fabos_grafana_compose_active | default(false)
+    - fabos_grafana_loki_enabled
+
+- name: Restart Alloy after configuration change
+  community.docker.docker_compose_v2:
+    project_src: "{{ fabos_grafana_project_dir }}"
+    project_name: "{{ fabos_grafana_project_name }}"
+    files:
+      - "{{ fabos_grafana_compose_file }}"
+    services:
+      - alloy
+    state: restarted
+  when:
+    - _fabos_grafana_compose_active | default(false)
+    - fabos_grafana_alloy_enabled

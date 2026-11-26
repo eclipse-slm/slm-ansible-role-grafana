@@ -70,6 +70,20 @@
     mode: "0400"
   no_log: true
 
+- name: Build effective Grafana datasource list
+  ansible.builtin.set_fact:
+    _fabos_grafana_effective_datasources: >-
+      {{
+        fabos_grafana_datasources
+        + ([_fabos_grafana_loki_datasource]
+           if (fabos_grafana_loki_enabled or fabos_grafana_alloy_enabled)
+              and fabos_grafana_loki_datasource_enabled
+              and fabos_grafana_loki_datasource_uid not in (fabos_grafana_datasources | map(attribute='uid', default='') | list)
+              and fabos_grafana_loki_datasource_name not in (fabos_grafana_datasources | map(attribute='name', default='') | list)
+           else [])
+      }}
+  no_log: true
+
 - name: Write Grafana datasource provisioning
   ansible.builtin.template:
     src: provisioning/datasources.yml.j2
@@ -78,7 +92,7 @@
     group: root
     mode: "0640"
   when: >-
-    fabos_grafana_datasources | length > 0
+    _fabos_grafana_effective_datasources | length > 0
     or fabos_grafana_delete_datasources | length > 0
     or fabos_grafana_datasource_prune
   no_log: true
@@ -89,7 +103,7 @@
     path: "{{ fabos_grafana_config_dir }}/provisioning/datasources/eclipse-slm-grafana-datasources.yml"
     state: absent
   when:
-    - fabos_grafana_datasources | length == 0
+    - _fabos_grafana_effective_datasources | length == 0
     - fabos_grafana_delete_datasources | length == 0
     - not fabos_grafana_datasource_prune
   notify: Restart Grafana after provisioning change
@@ -253,6 +267,56 @@
     - fabos_grafana_alerting.get('mute_timings', []) | length == 0
     - fabos_grafana_alerting.get('delete_mute_timings', []) | length == 0
   notify: Restart Grafana after provisioning change
+
+- name: Create Loki config directory
+  ansible.builtin.file:
+    path: "{{ fabos_grafana_config_dir }}/loki"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: fabos_grafana_loki_enabled
+
+- name: Write Loki configuration
+  ansible.builtin.template:
+    src: loki/loki-config.yml.j2
+    dest: "{{ fabos_grafana_config_dir }}/loki/loki-config.yml"
+    owner: root
+    group: root
+    mode: "0644"
+  when: fabos_grafana_loki_enabled
+  notify: Restart Loki after configuration change
+
+- name: Remove Loki configuration when Loki is disabled
+  ansible.builtin.file:
+    path: "{{ fabos_grafana_config_dir }}/loki/loki-config.yml"
+    state: absent
+  when: not fabos_grafana_loki_enabled
+
+- name: Create Alloy config directory
+  ansible.builtin.file:
+    path: "{{ fabos_grafana_config_dir }}/alloy"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: fabos_grafana_alloy_enabled
+
+- name: Write Alloy configuration
+  ansible.builtin.template:
+    src: alloy/config.alloy.j2
+    dest: "{{ fabos_grafana_config_dir }}/alloy/config.alloy"
+    owner: root
+    group: root
+    mode: "0644"
+  when: fabos_grafana_alloy_enabled
+  notify: Restart Alloy after configuration change
+
+- name: Remove Alloy configuration when Alloy is disabled
+  ansible.builtin.file:
+    path: "{{ fabos_grafana_config_dir }}/alloy/config.alloy"
+    state: absent
+  when: not fabos_grafana_alloy_enabled
 
 - name: Reset Grafana container environment map
   ansible.builtin.set_fact:

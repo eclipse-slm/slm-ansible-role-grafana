@@ -277,6 +277,35 @@
           - grafana_datasource_query.json.results.A.frames[0].data['values'][1] | length > 0
           - grafana_datasource_query.json.results.A.frames[0].data['values'][1][0] | int == 1
 
+    - name: Assert the Loki datasource was provisioned automatically
+      ansible.builtin.assert:
+        that:
+          - grafana_datasources.json | selectattr('uid', 'equalto', 'loki') | list | length == 1
+          - (grafana_datasources.json | selectattr('uid', 'equalto', 'loki') | first).url == 'http://loki:3100'
+
+    - name: Query the Loki datasource health endpoint
+      ansible.builtin.uri:
+        url: http://127.0.0.1:3000/api/datasources/uid/loki/health
+        method: GET
+        url_username: admin
+        url_password: "Molecule-Test${MISSING}Tail"
+        force_basic_auth: true
+        return_content: true
+      register: grafana_loki_health
+      retries: 30
+      delay: 5
+      until: grafana_loki_health.status | default(0) == 200
+      failed_when: grafana_loki_health.status | default(0) != 200
+
+    - name: Wait for Alloy to ship host logs to Loki
+      ansible.builtin.uri:
+        url: http://127.0.0.1:3100/loki/api/v1/label/job/values
+        return_content: true
+      register: grafana_loki_jobs
+      retries: 30
+      delay: 5
+      until: "'varlogs' in (grafana_loki_jobs.json.data | default([]))"
+
     - name: Query provisioned Grafana alert rules
       ansible.builtin.uri:
         url: http://127.0.0.1:3000/api/v1/provisioning/alert-rules

@@ -26,7 +26,70 @@ services:
         source: {{ ((fabos_grafana_config_dir ~ '/secrets') | replace('$', '$$')) | to_json }}
         target: /etc/grafana/secrets
         read_only: true
+{% if fabos_grafana_loki_enabled %}
+
+  loki:
+    image: "{{ fabos_grafana_loki_image }}:{{ fabos_grafana_loki_version }}"
+    restart: "{{ fabos_grafana_restart_policy }}"
+    command:
+      - -config.file=/etc/loki/config.yml
+{% if fabos_grafana_loki_publish_port %}
+    ports:
+      - target: 3100
+        published: "{{ fabos_grafana_loki_http_port }}"
+        protocol: tcp
+{% endif %}
+    volumes:
+      - type: volume
+        source: loki_data
+        target: /loki
+        # Keep the role-set ownership: copying image content would reset it to root.
+        volume:
+          nocopy: true
+      - type: bind
+        source: {{ ((fabos_grafana_config_dir ~ '/loki/loki-config.yml') | replace('$', '$$')) | to_json }}
+        target: /etc/loki/config.yml
+        read_only: true
+{% endif %}
+{% if fabos_grafana_alloy_enabled %}
+
+  alloy:
+    image: "{{ fabos_grafana_alloy_image }}:{{ fabos_grafana_alloy_version }}"
+    restart: "{{ fabos_grafana_restart_policy }}"
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
+      - --disable-reporting
+      - /etc/alloy/config.alloy
+{% if fabos_grafana_loki_enabled %}
+    depends_on:
+      - loki
+{% endif %}
+    volumes:
+      - type: volume
+        source: alloy_data
+        target: /var/lib/alloy/data
+      - type: bind
+        source: {{ ((fabos_grafana_config_dir ~ '/alloy/config.alloy') | replace('$', '$$')) | to_json }}
+        target: /etc/alloy/config.alloy
+        read_only: true
+{% for log_dir in fabos_grafana_alloy_host_log_dirs %}
+      - type: bind
+        source: {{ (log_dir | replace('$', '$$')) | to_json }}
+        target: {{ (log_dir | replace('$', '$$')) | to_json }}
+        read_only: true
+{% endfor %}
+{% endif %}
 
 volumes:
   grafana_data:
     name: "{{ fabos_grafana_data_volume_name }}"
+{% if fabos_grafana_loki_enabled %}
+  loki_data:
+    name: "{{ fabos_grafana_loki_data_volume_name }}"
+{% endif %}
+{% if fabos_grafana_alloy_enabled %}
+  alloy_data:
+    name: "{{ fabos_grafana_alloy_data_volume_name }}"
+{% endif %}

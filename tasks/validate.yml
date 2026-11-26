@@ -49,3 +49,64 @@
   loop: "{{ fabos_grafana_dashboards | dict2items }}"
   loop_control:
     label: "{{ item.key }}"
+
+- name: Validate Loki and Alloy toggles
+  ansible.builtin.assert:
+    that:
+      - fabos_grafana_loki_enabled is boolean
+      - fabos_grafana_alloy_enabled is boolean
+      - fabos_grafana_loki_publish_port is boolean
+      - fabos_grafana_loki_datasource_enabled is boolean
+    fail_msg: >-
+      fabos_grafana_loki_enabled, fabos_grafana_alloy_enabled, fabos_grafana_loki_publish_port
+      and fabos_grafana_loki_datasource_enabled must be booleans.
+
+- name: Validate Loki HTTP port
+  ansible.builtin.assert:
+    that:
+      - fabos_grafana_loki_http_port | string is match('^[0-9]+$')
+      - fabos_grafana_loki_http_port | int >= 1
+      - fabos_grafana_loki_http_port | int <= 65535
+      - fabos_grafana_loki_http_port | int != fabos_grafana_http_port | int
+    fail_msg: fabos_grafana_loki_http_port must be an integer between 1 and 65535 and differ from fabos_grafana_http_port.
+  when:
+    - fabos_grafana_loki_enabled
+    - fabos_grafana_loki_publish_port
+
+- name: Require a Loki URL for Alloy when Loki is not deployed by the role
+  ansible.builtin.assert:
+    that:
+      - fabos_grafana_loki_url is string
+      - fabos_grafana_loki_url is match('^https?://[^\s]+$')
+    fail_msg: >-
+      fabos_grafana_loki_url must be set to the base URL of an external Loki (for example
+      http://loki.example.org:3100) when fabos_grafana_alloy_enabled is true and
+      fabos_grafana_loki_enabled is false.
+  when:
+    - fabos_grafana_alloy_enabled
+    - not fabos_grafana_loki_enabled
+
+- name: Validate Loki and Alloy configuration inputs
+  ansible.builtin.assert:
+    that:
+      - fabos_grafana_loki_config_overrides is mapping
+      - fabos_grafana_alloy_file_targets is sequence
+      - fabos_grafana_alloy_file_targets is not string
+      - fabos_grafana_alloy_file_targets | reject('mapping') | list | length == 0
+      - fabos_grafana_alloy_file_targets | rejectattr('__path__', 'defined') | list | length == 0
+      - fabos_grafana_alloy_extra_config is string
+      - fabos_grafana_alloy_config is string
+    fail_msg: >-
+      fabos_grafana_loki_config_overrides must be a mapping, fabos_grafana_alloy_file_targets must be
+      a list of mappings that each define __path__, and fabos_grafana_alloy_extra_config and
+      fabos_grafana_alloy_config must be strings.
+
+- name: Validate Alloy host log directories
+  ansible.builtin.assert:
+    that:
+      - item is string
+      - item is match('^/')
+      - "':' not in item"
+    fail_msg: "Alloy host log directory '{{ item }}' must be an absolute path without a colon."
+  loop: "{{ fabos_grafana_alloy_host_log_dirs }}"
+  when: fabos_grafana_alloy_enabled

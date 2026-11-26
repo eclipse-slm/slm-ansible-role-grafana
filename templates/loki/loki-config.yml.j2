@@ -1,0 +1,3 @@
+---
+# Managed by Ansible (eclipse_slm.grafana)
+{{ _fabos_grafana_loki_base_config | combine(fabos_grafana_loki_config_overrides, recursive=True) | to_nice_yaml(indent=2) }}

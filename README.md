@@ -59,6 +59,9 @@ All role variables use the `fabos_grafana_` prefix.
 | `fabos_grafana_dashboard_providers` | `[]` | Grafana dashboard provider objects, written under `provisioning/dashboards`. |
 | `fabos_grafana_dashboards` | `{}` | Mapping of simple `.json` filenames to Grafana dashboard model objects. |
 | `fabos_grafana_alerting` | See below | Lists of alert rules, contact points, notification policies, templates, and mute timings. |
+| `fabos_grafana_loki_enabled` | `false` | Deploy Loki in the Grafana Compose project. See [Loki and Alloy](#loki-and-alloy). |
+| `fabos_grafana_alloy_enabled` | `false` | Deploy Grafana Alloy in the Grafana Compose project to collect host logs. |
+| `fabos_grafana_loki_*`, `fabos_grafana_alloy_*` | See below | Image, version, port, volume, and configuration settings for Loki and Alloy. |
 
 `fabos_grafana_alerting` defaults to:
 
@@ -209,6 +212,73 @@ A working datasource returns `"status":"OK"`, for example:
 Grafana reports an unreachable or misconfigured Prometheus from this endpoint with a non-200 status, so a failing check surfaces as an HTTP error rather than a JSON body.
 
 For a complete runnable example, see the `ubuntu24` Molecule scenario. It starts a `prom/prometheus` container on port 9090 outside the Grafana Compose project, provisions the datasource against the host address, and asserts the health endpoint plus a real query result: it POSTs an instant `up` query to Grafana's `/api/ds/query` endpoint and checks that samples come back.
+
+## Loki and Alloy
+
+The role can optionally deploy [Loki](https://grafana.com/docs/loki/latest/) and [Grafana Alloy](https://grafana.com/docs/alloy/latest/) as additional services in the same Compose project as Grafana. Both are disabled by default.
+
+```yaml
+fabos_grafana_loki_enabled: true
+fabos_grafana_loki_version: "3.6.0"
+fabos_grafana_alloy_enabled: true
+fabos_grafana_alloy_version: "v1.22.0"
+```
+
+When either service is enabled, the role adds a Loki datasource to the Grafana datasource provisioning file (alongside `fabos_grafana_datasources`):
+
+- With `fabos_grafana_loki_enabled: true`, the datasource points at `http://loki:3100` over the Compose network, and Alloy pushes there.
+- With only `fabos_grafana_alloy_enabled: true`, set `fabos_grafana_loki_url` to the base URL of an existing Loki (for example `http://loki.example.org:3100`). Alloy pushes to `<url>/loki/api/v1/push` and the datasource points at `<url>`. The role fails validation if this URL is missing.
+
+The automatic datasource is skipped if `fabos_grafana_loki_datasource_enabled` is `false`, or if `fabos_grafana_datasources` already contains an entry with the same `uid` or `name`, so you can supply your own Loki datasource definition.
+
+Loki runs as a single-binary instance with filesystem storage (TSDB, schema v13) in a persistent named volume. The role creates that volume before starting Compose and makes it writable by the Loki container user, because the distroless Loki image does not provide a pre-owned `/loki` directory. Alloy keeps its read positions and state in a named volume and mounts each host directory listed in `fabos_grafana_alloy_host_log_dirs` read-only at the same path. Configuration files are written to `<config_dir>/loki/loki-config.yml` and `<config_dir>/alloy/config.alloy`; a change restarts only the affected service.
+
+### Alloy configuration
+
+By default the role generates an Alloy pipeline (`local.file_match` → `loki.source.file` → `loki.write "default"`) from `fabos_grafana_alloy_file_targets`. Each target is a mapping: `__path__` is a file glob and every other key becomes a Loki label.
+
+```yaml
+fabos_grafana_alloy_host_log_dirs:
+  - /var/log
+  - /srv/app/logs
+fabos_grafana_alloy_file_targets:
+  - __path__: /var/log/*log
+    job: varlogs
+    host: "{{ inventory_hostname }}"
+  - __path__: /srv/app/logs/*.log
+    job: app
+```
+
+To add your own components, put [Alloy configuration syntax](https://grafana.com/docs/alloy/latest/get-started/configuration-syntax/) in `fabos_grafana_alloy_extra_config`; it is appended to the generated pipeline and can forward to `loki.write.default.receiver`. To take full control, set `fabos_grafana_alloy_config`; it replaces the generated file entirely (and `fabos_grafana_alloy_extra_config` is ignored). Mark values containing `{{ ... }}` as `!unsafe` so Ansible does not template them.
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `fabos_grafana_loki_enabled` | `false` | Deploy Loki. |
+| `fabos_grafana_loki_image` / `_version` | `grafana/loki` / `latest` | Loki image and tag; pin the tag in production. |
+| `fabos_grafana_loki_publish_port` | `true` | Publish Loki's HTTP port on the host, for example so Alloy on other hosts can push logs. Grafana and the bundled Alloy use the Compose network and do not need it. |
+| `fabos_grafana_loki_http_port` | `3100` | Host port for Loki's HTTP API when published. |
+| `fabos_grafana_loki_data_volume_name` | `<project_name>-loki-data` | Persistent Loki data volume. |
+| `fabos_grafana_loki_container_uid` / `_gid` | `10001` / `10001` | Owner the role sets on the Loki data volume, matching the official Loki container user. |
+| `fabos_grafana_loki_retention_period` | `744h` | Log retention enforced by the Loki compactor. |
+| `fabos_grafana_loki_config_overrides` | `{}` | Mapping recursively merged into the generated Loki configuration. |
+| `fabos_grafana_loki_url` | `""` | Base URL of an external Loki. Required when only Alloy is enabled; ignored when Loki is deployed by the role. |
+| `fabos_grafana_alloy_enabled` | `false` | Deploy Alloy. |
+| `fabos_grafana_alloy_image` / `_version` | `grafana/alloy` / `latest` | Alloy image and tag; pin the tag in production. |
+| `fabos_grafana_alloy_data_volume_name` | `<project_name>-alloy-data` | Volume for Alloy's storage path (read positions, state). |
+| `fabos_grafana_alloy_host_log_dirs` | `['/var/log']` | Host directories mounted read-only into Alloy at the same path. |
+| `fabos_grafana_alloy_file_targets` | `/var/log/*log`, job `varlogs` | File targets for the generated pipeline. Each needs `__path__`. |
+| `fabos_grafana_alloy_extra_config` | `""` | Raw Alloy configuration appended to the generated pipeline. |
+| `fabos_grafana_alloy_config` | `""` | Raw Alloy configuration that replaces the generated file when non-empty. |
+| `fabos_grafana_loki_datasource_enabled` | `true` | Provision the Loki datasource automatically when Loki or Alloy is enabled. |
+| `fabos_grafana_loki_datasource_name` / `_uid` | `Loki` / `loki` | Name and UID of the automatic Loki datasource. |
+
+Disabling Loki or Alloy later removes its container (the role deploys with `remove_orphans`) and its config file, but keeps its data volume. The Loki datasource is removed from the provisioning file, but Grafana keeps it in its database unless you list it in `fabos_grafana_delete_datasources` or enable `fabos_grafana_datasource_prune`.
+
+Run the local rendering test (requires Docker, used to validate the generated Alloy syntax) with:
+
+```sh
+MOLECULE_PROJECT_DIRECTORY="$PWD" ansible-playbook -i localhost, tests/loki-alloy.yml
+```
 
 ## Testing
 

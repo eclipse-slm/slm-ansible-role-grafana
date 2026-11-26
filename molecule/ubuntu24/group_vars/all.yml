@@ -1,8 +1,10 @@
 # Shared configuration for the KubeVirt scenario's converge, side-effect, and verify plays.
 ---
 fabos_grafana_project_dir: "/opt/grafana-test$dir"
+fabos_grafana_config_dir: "{{ fabos_grafana_project_dir }}"
 fabos_grafana_dashboard_dir: "{{ fabos_grafana_config_dir }}/dashboards/role-managed"
 fabos_grafana_project_name: grafana
+fabos_grafana_compose_file: docker-compose.yml
 fabos_grafana_data_volume_name: grafana-data
 # Prometheus runs outside the Grafana Compose project and is addressed by the
 # VM address so container-local 127.0.0.1 is never used.
@@ -12,6 +14,10 @@ fabos_grafana_version: "13.3.0"
 fabos_grafana_admin_password: "Molecule-Test${MISSING}Tail"
 fabos_grafana_container_uid: 472
 fabos_grafana_container_gid: 472
+fabos_grafana_loki_enabled: true
+fabos_grafana_loki_version: "3.6.0"
+fabos_grafana_alloy_enabled: true
+fabos_grafana_alloy_version: "v1.22.0"
 fabos_grafana_environment:
   GF_TEST_VALUE: "quoted: value #1"
 fabos_grafana_datasources:

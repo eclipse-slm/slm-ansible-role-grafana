@@ -32,3 +32,41 @@ fabos_grafana_alerting:
   delete_templates: []
   mute_timings: []
   delete_mute_timings: []
+
+# Loki (optional, deployed in the same Compose project as Grafana)
+fabos_grafana_loki_enabled: false
+fabos_grafana_loki_image: grafana/loki
+fabos_grafana_loki_version: latest
+fabos_grafana_loki_publish_port: true
+fabos_grafana_loki_http_port: 3100
+fabos_grafana_loki_container_uid: 10001
+fabos_grafana_loki_container_gid: 10001
+fabos_grafana_loki_data_volume_name: "{{ fabos_grafana_project_name }}-loki-data"
+fabos_grafana_loki_retention_period: 744h
+fabos_grafana_loki_config_overrides: {}
+# Base URL of an external Loki. Only used when Loki is not deployed by this role
+# (for example, Alloy-only deployments). Ignored when fabos_grafana_loki_enabled is true.
+fabos_grafana_loki_url: ""
+
+# Grafana Alloy (optional, deployed in the same Compose project as Grafana)
+fabos_grafana_alloy_enabled: false
+fabos_grafana_alloy_image: grafana/alloy
+fabos_grafana_alloy_version: latest
+fabos_grafana_alloy_data_volume_name: "{{ fabos_grafana_project_name }}-alloy-data"
+fabos_grafana_alloy_host_log_dirs:
+  - /var/log
+# Each target is an Alloy file target: "__path__" is a glob, other keys become Loki labels.
+fabos_grafana_alloy_file_targets:
+  - __path__: /var/log/*log
+    job: varlogs
+    host: "{{ inventory_hostname }}"
+# Raw Alloy configuration appended to the generated config. Forward logs to
+# loki.write.default.receiver to send them to the configured Loki.
+fabos_grafana_alloy_extra_config: ""
+# Raw Alloy configuration that replaces the generated config entirely when non-empty.
+fabos_grafana_alloy_config: ""
+
+# Loki datasource, provisioned automatically when Loki or Alloy is enabled
+fabos_grafana_loki_datasource_enabled: true
+fabos_grafana_loki_datasource_name: Loki
+fabos_grafana_loki_datasource_uid: loki

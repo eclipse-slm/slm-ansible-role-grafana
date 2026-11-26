@@ -1,0 +1,127 @@
+---
+- name: Check that Loki and Alloy render and are provisioned as a datasource
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: true
+  vars:
+    fabos_grafana_admin_password: test-only-password
+    fabos_grafana_datasources:
+      - name: Prometheus
+        uid: prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus.example.org:9090
+  tasks:
+    - name: Create a temporary project directory
+      ansible.builtin.tempfile:
+        state: directory
+        prefix: grafana-loki-alloy-
+      register: grafana_loki_test_directory
+
+    - name: Configure Grafana with Loki and Alloy
+      ansible.builtin.include_role:
+        name: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}"
+        tasks_from: configure.yml
+      vars:
+        fabos_grafana_project_dir: "{{ grafana_loki_test_directory.path }}/full$stack"
+        fabos_grafana_loki_enabled: true
+        fabos_grafana_alloy_enabled: true
+        fabos_grafana_loki_retention_period: 168h
+        fabos_grafana_alloy_extra_config: |
+          // custom block
+          logging {
+            level = "warn"
+          }
+
+    - name: Validate the generated Compose configuration
+      ansible.builtin.command:
+        cmd: docker compose config --format json
+        chdir: "{{ grafana_loki_test_directory.path }}/full$stack"
+      register: grafana_loki_compose
+      changed_when: false
+
+    - name: Read generated datasource, Loki and Alloy files
+      ansible.builtin.slurp:
+        src: "{{ grafana_loki_test_directory.path }}/full$stack/{{ item }}"
+      loop:
+        - provisioning/datasources/eclipse-slm-grafana-datasources.yml
+        - loki/loki-config.yml
+        - alloy/config.alloy
+      register: grafana_loki_files
+
+    - name: Assert the full stack rendered correctly
+      vars:
+        compose: "{{ grafana_loki_compose.stdout | from_json }}"
+        datasources: "{{ (grafana_loki_files.results[0].content | b64decode | from_yaml).datasources }}"
+        loki: "{{ grafana_loki_files.results[1].content | b64decode | from_yaml }}"
+        alloy: "{{ grafana_loki_files.results[2].content | b64decode }}"
+      ansible.builtin.assert:
+        that:
+          - compose.services.keys() | sort == ['alloy', 'grafana', 'loki']
+          - compose.services.loki.ports[0].published | string == '3100'
+          - >-
+            (compose.services.loki.volumes | selectattr('target', 'equalto', '/etc/loki/config.yml') | first).source
+            == grafana_loki_test_directory.path ~ '/full$$stack/loki/loki-config.yml'
+          - compose.services.alloy.volumes | selectattr('target', 'equalto', '/var/log') | list | length == 1
+          - compose.volumes.loki_data.name == 'grafana-loki-data'
+          - datasources | map(attribute='uid') | list == ['prometheus', 'loki']
+          - (datasources | selectattr('uid', 'equalto', 'loki') | first).url == 'http://loki:3100'
+          - (datasources | selectattr('uid', 'equalto', 'loki') | first).type == 'loki'
+          - loki.limits_config.retention_period == '168h'
+          - "'url = \"http://loki:3100/loki/api/v1/push\"' in alloy"
+          - "'\"__path__\" = \"/var/log/*log\"' in alloy"
+          - "'// custom block' in alloy"
+
+    - name: Configure Grafana with Alloy shipping to an external Loki
+      ansible.builtin.include_role:
+        name: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}"
+        tasks_from: configure.yml
+      vars:
+        fabos_grafana_project_dir: "{{ grafana_loki_test_directory.path }}/alloy-only"
+        fabos_grafana_alloy_enabled: true
+        fabos_grafana_loki_url: http://loki.example.org:3100/
+
+    - name: Validate the Alloy-only Compose configuration
+      ansible.builtin.command:
+        cmd: docker compose config --format json
+        chdir: "{{ grafana_loki_test_directory.path }}/alloy-only"
+      register: grafana_alloy_compose
+      changed_when: false
+
+    - name: Read Alloy-only datasource and Alloy files
+      ansible.builtin.slurp:
+        src: "{{ grafana_loki_test_directory.path }}/alloy-only/{{ item }}"
+      loop:
+        - provisioning/datasources/eclipse-slm-grafana-datasources.yml
+        - alloy/config.alloy
+      register: grafana_alloy_files
+
+    - name: Assert Alloy-only rendering targets the external Loki
+      vars:
+        compose: "{{ grafana_alloy_compose.stdout | from_json }}"
+        datasources: "{{ (grafana_alloy_files.results[0].content | b64decode | from_yaml).datasources }}"
+        alloy: "{{ grafana_alloy_files.results[1].content | b64decode }}"
+      ansible.builtin.assert:
+        that:
+          - compose.services.keys() | sort == ['alloy', 'grafana']
+          - (datasources | selectattr('uid', 'equalto', 'loki') | first).url == 'http://loki.example.org:3100'
+          - "'url = \"http://loki.example.org:3100/loki/api/v1/push\"' in alloy"
+
+    - name: Validate the generated Alloy configuration syntax
+      ansible.builtin.command:
+        argv:
+          - docker
+          - run
+          - --rm
+          - --volume
+          - "{{ grafana_loki_test_directory.path }}/full$stack/alloy/config.alloy:/tmp/config.alloy:ro"
+          - grafana/alloy:latest
+          - fmt
+          - /tmp/config.alloy
+      changed_when: false
+
+    - name: Remove the temporary project directory
+      ansible.builtin.file:
+        path: "{{ grafana_loki_test_directory.path }}"
+        state: absent

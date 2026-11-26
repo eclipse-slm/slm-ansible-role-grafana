@@ -3,6 +3,29 @@
   ansible.builtin.set_fact:
     _fabos_grafana_compose_active: true
 
+# The Loki image is distroless and has no /loki directory, so Docker would create the
+# data volume owned by root and Loki (non-root) would crash-loop. Pre-create the volume
+# with Compose's labels so Compose adopts it, and hand its mount point to the Loki user.
+# The Compose mount uses nocopy so Docker does not reset that ownership on first mount.
+- name: Create Loki data volume
+  community.docker.docker_volume:
+    name: "{{ fabos_grafana_loki_data_volume_name }}"
+    labels:
+      com.docker.compose.project: "{{ fabos_grafana_project_name }}"
+      com.docker.compose.volume: loki_data
+  register: _fabos_grafana_loki_volume
+  when: fabos_grafana_loki_enabled
+
+- name: Set Loki data volume ownership
+  ansible.builtin.file:
+    path: "{{ _fabos_grafana_loki_volume.volume.Mountpoint }}"
+    state: directory
+    owner: "{{ fabos_grafana_loki_container_uid }}"
+    group: "{{ fabos_grafana_loki_container_gid }}"
+    mode: "0750"
+  when: fabos_grafana_loki_enabled
+  notify: Restart Loki after configuration change
+
 - name: Ensure Grafana Compose project is running
   community.docker.docker_compose_v2:
     project_src: "{{ fabos_grafana_project_dir }}"
@@ -11,4 +34,5 @@
       - "{{ fabos_grafana_compose_file }}"
     state: present
     pull: "{{ fabos_grafana_pull_policy }}"
+    remove_orphans: true
   no_log: true

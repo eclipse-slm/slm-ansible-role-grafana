@@ -1,0 +1,31 @@
+// Managed by Ansible (eclipse_slm.grafana)
+{% if fabos_grafana_alloy_config | length > 0 %}
+{{ fabos_grafana_alloy_config }}
+{% else %}
+local.file_match "files" {
+  path_targets = [
+{% for target in fabos_grafana_alloy_file_targets %}
+    {
+{% for key, value in target.items() %}
+      {{ key | string | to_json }} = {{ value | string | to_json }},
+{% endfor %}
+    },
+{% endfor %}
+  ]
+}
+
+loki.source.file "files" {
+  targets    = local.file_match.files.targets
+  forward_to = [loki.write.default.receiver]
+}
+
+loki.write "default" {
+  endpoint {
+    url = {{ (_fabos_grafana_loki_effective_url ~ '/loki/api/v1/push') | to_json }}
+  }
+}
+{% if fabos_grafana_alloy_extra_config | length > 0 %}
+
+{{ fabos_grafana_alloy_extra_config }}
+{% endif %}
+{% endif %}
